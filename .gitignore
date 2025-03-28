@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+*.DS_Store
+
+# Entornos virtuales
+ambiente/
+.ambiente/
+venv/
+env/
+.venv/
+.conda/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Configuración de IDEs
+.vscode/
+.idea/
+*.iml
+
+# Archivos de logs y caché
+logs/
+*.log
+*.sqlite
+*.db
+*.sqlite3
+cache/
+*.pid
+
+# Archivos de FastAPI/Uvicorn
+*.pid
+instance/
+*.db-journal
+
+# Archivos sensibles
+.env
+.env.*
+secrets.json
+.ambiente
+.testeo
+testeo
+# Docker
+docker-compose.override.yml
