@@ -4,3 +4,5 @@ pandas
 uvicorn
 pydantic
 fastapi[all]
+sqlalchemy 
+psycopg2
