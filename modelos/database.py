@@ -1,10 +1,15 @@
+from dotenv import load_dotenv
+import os
 from sqlalchemy import create_engine
-
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "postgresql://ibm_cloud_9b28f112_cd7b_4807_b8c2_b3a0ff511e01:MILnbZ0yQkISTKuWZbeQxZTrCr8a0DKr@4d437ecc-844f-4a46-b103-32f5ebefe84a.0135ec03d5bf43b196433793c98e8bd5.databases.appdomain.cloud:30429/ibmclouddb"
+# Cargar las variables de entorno desde el archivo .env
+load_dotenv()
 
-engine = create_engine(DATABASE_URL )
+# Obtener la URL de la base de datos desde la variable de entorno
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
@@ -16,4 +21,5 @@ def get_db():
         yield db
     finally:
         db.close()
+
 

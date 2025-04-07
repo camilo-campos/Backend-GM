@@ -6,3 +6,4 @@ pydantic
 fastapi[all]
 sqlalchemy 
 psycopg2
+python-dotenv
