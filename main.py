@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from rutas.ws_router import router  # Importar el WebSocket Router
 from rutas.sensores_router import router as sensores_router
 
 
@@ -11,7 +10,7 @@ app = FastAPI(title="backend GM",
 from modelos.database import engine, Base
 
 # Crear todas las tablas
-Base.metadata.create_all(bind=engine  )
+Base.metadata.create_all(bind=engine)
 
 
 # Configurar CORS
@@ -24,5 +23,5 @@ app.add_middleware(
 )
 
 # Registrar routers existentes
-app.include_router(router)
+
 app.include_router(sensores_router)

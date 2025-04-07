@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends , HTTPException
+from esquemas.esquema import SensorInput
 from sqlalchemy.orm import Session
 from modelos.database import get_db
 from modelos.modelos import SensorCorriente, SensorPresionAgua, SensorSalidaAgua
@@ -68,54 +69,139 @@ def predecir_sensores(datos, modelo):
     return modelo.predict(df_nuevo).tolist()
 
 
+
+@router.post("/prediccion_corriente")
+async def predecir_corriente(sensor: SensorInput, db: Session = Depends(get_db)):
+    try:
+        # Realizar la predicción (el modelo devuelve 1 o -1)
+        prediccion = predecir_sensores([[sensor.valor]], modelos["corriente_motor"])
+        clase = int(prediccion[0])
+
+        # Buscar el registro en la base de datos por ID
+        sensor_db = db.query(SensorCorriente).filter(SensorCorriente.id == sensor.id_sensor).first()
+        if not sensor_db:
+            raise HTTPException(status_code=404, detail="Sensor no encontrado")
+
+        # Actualizar la clasificación
+        sensor_db.clasificacion = clase
+        db.commit()
+
+        # Traducción opcional de la clase
+        descripcion = "Normal" if clase == 1 else "Anomalía"
+
+        return {
+            "id_sensor": sensor.id_sensor,
+            "valor": sensor.valor,
+            "prediccion": clase,
+            "descripcion": descripcion,
+            "mensaje": "Clasificación actualizada correctamente"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/prediccion_salida-agua")
+async def predecir_salida(sensor: SensorInput, db: Session = Depends(get_db)):
+    try:
+        # Realizar la predicción (el modelo devuelve 1 o -1)
+        prediccion = predecir_sensores([[sensor.valor]], modelos["salida_bomba"])
+        clase = int(prediccion[0])
+
+        # Buscar el registro en la base de datos por ID
+        sensor_db = db.query(SensorSalidaAgua).filter(SensorSalidaAgua.id == sensor.id_sensor).first()
+        if not sensor_db:
+            raise HTTPException(status_code=404, detail="Sensor no encontrado")
+
+        # Actualizar la clasificación
+        sensor_db.clasificacion = clase
+        db.commit()
+
+        # Traducción opcional de la clase
+        descripcion = "Normal" if clase == 1 else "Anomalía"
+
+        return {
+            "id_sensor": sensor.id_sensor,
+            "valor": sensor.valor,
+            "prediccion": clase,
+            "descripcion": descripcion,
+            "mensaje": "Clasificación actualizada correctamente"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+@router.post("/prediccion_presion-agua")
+async def predecir_presion(sensor: SensorInput, db: Session = Depends(get_db)):
+    try:
+        # Realizar la predicción (el modelo devuelve 1 o -1)
+        prediccion = predecir_sensores([[sensor.valor]], modelos["presion_agua"])
+        clase = int(prediccion[0])
+
+        # Buscar el registro en la base de datos por ID
+        sensor_db = db.query(SensorPresionAgua).filter(SensorPresionAgua.id == sensor.id_sensor).first()
+        if not sensor_db:
+            raise HTTPException(status_code=404, detail="Sensor no encontrado")
+
+        # Actualizar la clasificación
+        sensor_db.clasificacion = clase
+        db.commit()
+
+        # Traducción opcional de la clase
+        descripcion = "Normal" if clase == 1 else "Anomalía"
+
+        return {
+            "id_sensor": sensor.id_sensor,
+            "valor": sensor.valor,
+            "prediccion": clase,
+            "descripcion": descripcion,
+            "mensaje": "Clasificación actualizada correctamente"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 # Ruta para obtener datos de sensores de corriente
 @router.get("/corriente")
 async def get_sensores_corriente(db: Session = Depends(get_db)):
     try:
-        
-        
         sensores = (
             db.query(SensorCorriente)
-            .order_by(SensorCorriente.id.desc())  # Ordenar en orden descendente (los más recientes primero)
+            .order_by(SensorCorriente.id.desc())  # Ordenar en orden descendente
             .limit(40)  # Obtener solo los últimos 40 registros
             .all()
         )
         
-            
         if not sensores:
             return {
                 "message": "No hay datos en la base de datos, devolviendo valores por defecto",
                 "data": DEFAULT_SENSORES_CORRIENTE,
             }
-            
-        datos=[]
-        sin_clasificacion=[]
-        for sensor in sensores:
-            datos.append({"id":sensor.id , "clasificación":sensor.clasificacion , "tiempo ejecucion":sensor.tiempo_ejecucion , "tiempo sensor :":sensor.tiempo_sensor , "valor sensor :":sensor.valor_sensor})
-            if sensor.clasificacion == None:
-                sin_clasificacion.append({"id":sensor.id , "clasificación":sensor.clasificacion , "tiempo ejecucion":sensor.tiempo_ejecucion , "tiempo sensor :":sensor.tiempo_sensor , "valor sensor :":sensor.valor_sensor})
-                for clasificar in sin_clasificacion:
-                    print("------------------------------")
-                    insert = predecir_sensores(clasificar.valor_sensor , modelos["corriente_motor"])
-                    print(insert)
-            
-        print("todos los datos :",datos)
-        print("--------------------------------------------------------------------------------------")
-        print("sin clasificacion :",sin_clasificacion)
+
             
         return sensores
-    except:
+    except Exception as e:
+        print("Error:", e)
         return {
             "message": "Error al conectar con la base de datos, devolviendo valores por defecto",
             "data": DEFAULT_SENSORES_CORRIENTE,
         }
 
 
+
 # Ruta para obtener datos de sensores de salida de agua
 @router.get("/salida-agua")
 async def get_sensores_salida_agua(db: Session = Depends(get_db)):
     try:
-        sensores = db.query(SensorSalidaAgua).all()
+        sensores = (db.query(SensorSalidaAgua).order_by(SensorSalidaAgua.id.desc())  # Ordenar en orden descendente
+            .limit(40)  # Obtener solo los últimos 40 registros
+            .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_SALIDA_AGUA}
         return sensores
@@ -126,7 +212,9 @@ async def get_sensores_salida_agua(db: Session = Depends(get_db)):
 @router.get("/presion-agua")
 async def get_sensores_presion_agua(db: Session = Depends(get_db)):
     try:
-        sensores = db.query(SensorPresionAgua).all()
+        sensores = (db.query(SensorPresionAgua).order_by(SensorPresionAgua.id.desc())  # Ordenar en orden descendente
+            .limit(40)  # Obtener solo los últimos 40 registros
+            .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
         return sensores
