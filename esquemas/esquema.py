@@ -11,4 +11,9 @@ class DatosSensores(BaseModel):
 class SensorInput(BaseModel):
     id_sensor: str
     valor: float
+    
+    
+class BitacoraInput(BaseModel):
+    id_bitacora: str
+    bitacora: str
 

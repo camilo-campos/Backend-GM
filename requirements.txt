@@ -6,5 +6,7 @@ pydantic
 fastapi[all]
 sqlalchemy 
 psycopg2-binary
-
+langchain 
+langchain-ibm 
+langchain_core
 python-dotenv
