@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime
+from sqlalchemy import Column, Integer, Float, String, DateTime , Text , func
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -95,3 +95,11 @@ class SensorVoltaje_barra(Base):
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
 
 
+class Bitacora(Base):
+    __tablename__ = 'bitacoras'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now(), nullable=False)
+    bitacora = Column(Text, nullable=False)
+    clasificacion = Column(Text, nullable=True)
+    alerta_aviso = Column(Text, nullable=True)
