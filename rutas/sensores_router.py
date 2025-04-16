@@ -380,8 +380,8 @@ async def get_sensores_corriente(db: Session = Depends(get_db)):
                 "data": DEFAULT_SENSORES_CORRIENTE,
             }
 
-            
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except Exception as e:
         print("Error:", e)
         return {
@@ -400,7 +400,10 @@ async def get_sensores_salida_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_SALIDA_AGUA}
-        return sensores
+        
+        
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_SALIDA_AGUA}
 
@@ -413,7 +416,8 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
 
@@ -426,7 +430,8 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
 
@@ -439,7 +444,8 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
 
@@ -452,7 +458,8 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
 
@@ -464,7 +471,8 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
 
@@ -476,7 +484,8 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
 
@@ -488,7 +497,8 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
 
@@ -500,6 +510,7 @@ async def get_sensores_presion_agua(db: Session = Depends(get_db)):
             .all())
         if not sensores:
             return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
-        return sensores
+        sensores_invertidos = list(reversed(sensores)) 
+        return sensores_invertidos
     except:
         return {"message": "Error al conectar con la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
