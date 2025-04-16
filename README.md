@@ -1,21 +1,35 @@
-# FastAPI Dashboard Backend
+# API de Monitoreo de Sensores y Análisis de Bitácoras
 
-## Descripción
-Este proyecto es un backend desarrollado con **FastAPI** que proporciona datos en tiempo real para un tablero **dashboard**. La aplicación se encarga de recibir, procesar y transmitir los datos mediante **WebSockets**, permitiendo una actualización en vivo de los gráficos en el frontend.
+Este proyecto de FastAPI proporciona una API para interactuar con datos de sensores y realizar análisis de bitácoras utilizando modelos de machine learning y procesamiento de lenguaje natural (PLN).
 
-## Características
-- API REST desarrollada con **FastAPI**.
-- Soporte para **WebSockets** para la transmisión de datos en tiempo real.
-- Integración con modelos de análisis como **IsolationForest** para detectar outliers.
-- Conexión a una base de datos para obtener datos de sensores.
-- Middleware **CORS** habilitado para permitir peticiones desde el frontend.
+## Descripción General
+
+La API permite:
+
+- **Obtener datos históricos de diversos sensores**: Corriente, presión de agua, salida de agua, generación de gas, temperatura ambiental, temperaturas internas de la bomba, vibración axial y voltaje de barra. Se devuelven los últimos 40 registros de cada tipo de sensor.
+- **Realizar predicciones sobre los valores de los sensores**: Utiliza modelos de machine learning pre-entrenados para clasificar los valores de los sensores como "Normal" o "Anomalía" y actualiza la clasificación en la base de datos.
+- **Analizar bitácoras de operación**: Emplea modelos de lenguaje grande (LLMs) a través de Langchain para analizar bitácoras textuales, identificar posibles fallas relacionadas con las bombas HRSG y generar alertas o avisos.
 
 ## Tecnologías Utilizadas
-- **Python 3.10+**
-- **FastAPI** (Framework principal)
-- **SQLAlchemy** (ORM para la base de datos)
-- **WebSockets** (Para comunicación en tiempo real)
-- **Scikit-learn** (Para modelos de análisis de datos)
+
+- **FastAPI**: Framework web moderno y de alto rendimiento para construir APIs con Python.
+- **SQLAlchemy**: Toolkit SQL y ORM para interactuar con la base de datos.
+- **Joblib**: Biblioteca para la serialización eficiente de objetos Python, utilizada para cargar los modelos de machine learning.
+- **Pandas**: Biblioteca para el análisis y manipulación de datos, utilizada para la entrada de los modelos de predicción.
+- **Langchain**: Framework para desarrollar aplicaciones impulsadas por modelos de lenguaje.
+- **Modelos de Machine Learning (scikit-learn)**: Modelos pre-entrenados (guardados con Joblib) para la clasificación de datos de sensores.
+- **Base de Datos (Especificar la base de datos utilizada)**: La API interactúa con una base de datos para almacenar y recuperar datos de sensores y bitácoras.
+
+## Requisitos
+
+Asegúrate de tener Python 3.7+ instalado.
+
+## Instalación
+
+1. **Clona el repositorio (si aplica):**
+   ```bash
+   git clone <URL_DEL_REPOSITORIO>
+   cd <NOMBRE_DEL_PROYECTO>
 
 ## Instalación
 ### Prerrequisitos
@@ -48,29 +62,7 @@ Este proyecto es un backend desarrollado con **FastAPI** que proporciona datos e
    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-## Uso de la API
-### Endpoints Principales
-| Método  | Ruta         | Descripción |
-|----------|-------------|-------------|
-| `GET`    | `/data`     | Obtiene los últimos datos de sensores |
-| `WS`     | `/ws`       | Conexión WebSocket para datos en tiempo real |
 
-### Ejemplo de Conexión WebSocket
-```python
-import websockets
-import asyncio
-import json
-
-async def receive_data():
-    uri = "ws://localhost:8000/ws"
-    async with websockets.connect(uri) as websocket:
-        while True:
-            response = await websocket.recv()
-            data = json.loads(response)
-            print("Datos recibidos:", data)
-
-asyncio.run(receive_data())
-```
 
 ## Contribución
 1. Hacer un fork del repositorio
