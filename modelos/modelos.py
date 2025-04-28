@@ -1,6 +1,19 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime , Text , func
+from sqlalchemy import Column, Integer, Float, String, DateTime , Text , func , ForeignKey
 from sqlalchemy.sql import func
 from .database import Base
+
+
+
+class Alerta(Base):
+    __tablename__ = 'alertas'
+
+    id = Column(Integer, primary_key=True, index=True)
+    sensor_id = Column(Integer, nullable=False)  # ID del sensor afectado
+    tipo_sensor = Column(String, nullable=False)  # Tipo de sensor (corriente, voltaje, etc.)
+    timestamp = Column(DateTime, default=func.now())  # Fecha y hora de la alerta
+    descripcion = Column(Text)  # Texto descriptivo de la alerta
+
+
 
 class SensorCorriente(Base):
     __tablename__ = 'sensores_corriente'
