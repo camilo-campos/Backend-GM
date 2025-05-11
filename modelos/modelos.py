@@ -12,6 +12,7 @@ class Alerta(Base):
     tipo_sensor = Column(String, nullable=False)  # Tipo de sensor (corriente, voltaje, etc.)
     timestamp = Column(DateTime, default=func.now())  # Fecha y hora de la alerta
     descripcion = Column(Text)  # Texto descriptivo de la alerta
+    contador_anomalias = Column(Integer, default=0)
 
 
 
@@ -23,6 +24,7 @@ class SensorCorriente(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor, puede ser int o float
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 class SensorSalidaAgua(Base):
     __tablename__ = 'sensores_salida_agua'
@@ -32,6 +34,7 @@ class SensorSalidaAgua(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 class SensorPresionAgua(Base):
     __tablename__ = 'sensores_presion_agua'
@@ -41,6 +44,7 @@ class SensorPresionAgua(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 
 class SensorMw_brutos_generacion_gas(Base):
@@ -51,6 +55,7 @@ class SensorMw_brutos_generacion_gas(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 
 class SensorTemperatura_Ambiental(Base):
@@ -61,6 +66,7 @@ class SensorTemperatura_Ambiental(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 class SensorTemperatura_descanso_interna_empuje_bomba_1aa(Base):
     __tablename__ = 'temperatura_descanso_interna_empuje_bomba_1a'
@@ -70,6 +76,7 @@ class SensorTemperatura_descanso_interna_empuje_bomba_1aa(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 class SensorTemperatura_descanso_interna_motor_bomba_1a(Base):
     __tablename__ = 'temperatura_descanso_interna_motor_bomba_1a'
@@ -79,6 +86,7 @@ class SensorTemperatura_descanso_interna_motor_bomba_1a(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 class SensorTemperatura_descanso_interno_bomba_1a(Base):
     __tablename__ = 'temperatura_descanso_interno_bomba_1a'
@@ -88,6 +96,7 @@ class SensorTemperatura_descanso_interno_bomba_1a(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 class SensorVibracion_axial_descanso(Base):
     __tablename__ = 'vibracion_axial_descanso'
@@ -97,6 +106,7 @@ class SensorVibracion_axial_descanso(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 class SensorVoltaje_barra(Base):
     __tablename__ = 'voltaje_barra'
@@ -106,6 +116,7 @@ class SensorVoltaje_barra(Base):
     tiempo_sensor = Column(String)  # Hora / minuto del sensor
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
 
 
 class Bitacora(Base):
