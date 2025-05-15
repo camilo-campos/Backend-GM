@@ -55,10 +55,91 @@ DEFAULT_SENSORES_PRESION_AGUA = [
 import os
 import joblib
 import pandas as pd
+import time
+import logging
+from functools import lru_cache
 
+# Configuración de logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Obtiene la ruta del archivo actual
 MODELS_DIR = os.path.join(BASE_DIR, "..", "modelos_prediccion")  # Ruta absoluta a la carpeta de modelos
+
+# Mapa de claves de modelo a rutas de archivo
+MODEL_PATHS = {
+    "corriente_motor": "model_Corriente Motor Bomba Agua Alimentacion BFWP A (A).pkl",
+    "mw_brutos_gas": "model_MW Brutos de Generación Total Gas (MW).pkl",
+    "presion_agua": "model_Presión Agua Alimentación AP (barg).pkl",
+    "salida_bomba": "model_Salida de Bomba de Alta Presión.pkl",
+    "temperatura_ambiental": "model_Temperatura Ambiental (°C).pkl",
+    "temp_descanso_bomba_1a": "model_Temperatura Descanso Interno Bomba 1A (°C).pkl",
+    "temp_descanso_empuje_bomba_1a": "model_Temperatura Descanso Interno Empuje Bomba 1A (°C).pkl",
+    "temp_descanso_motor_bomba_1a": "model_Temperatura Descanso Interno Motor Bomba 1A (°C).pkl",
+    "vibracion_axial_empuje": "model_Vibración Axial Descanso Emp Bomba 1A (ms).pkl",
+    "voltaje_barra": "model_Voltaje Barra 6,6KV (V).pkl",
+}
+
+class ModelRegistry:
+    """Registro de modelos con carga perezosa (lazy loading)"""
+    _models = {}
+    _load_times = {}
+    _access_count = {}
+    
+    @classmethod
+    def get_model(cls, model_key):
+        """Obtiene un modelo, cargándolo si es necesario"""
+        if model_key not in MODEL_PATHS:
+            raise KeyError(f"Modelo no reconocido: {model_key}")
+        
+        # Cargar el modelo si aún no está en memoria
+        if model_key not in cls._models:
+            start_time = time.time()
+            logger.info(f"Cargando modelo {model_key}...")
+            
+            model_path = os.path.join(MODELS_DIR, MODEL_PATHS[model_key])
+            cls._models[model_key] = joblib.load(model_path)
+            
+            load_time = time.time() - start_time
+            cls._load_times[model_key] = load_time
+            cls._access_count[model_key] = 0
+            
+            logger.info(f"Modelo {model_key} cargado en {load_time:.4f} segundos")
+        
+        # Incrementar el contador de accesos
+        cls._access_count[model_key] = cls._access_count.get(model_key, 0) + 1
+        
+        return cls._models[model_key]
+    
+    @classmethod
+    def get_stats(cls):
+        """Devuelve estadísticas de uso de los modelos"""
+        return {
+            "loaded_models": list(cls._models.keys()),
+            "load_times": cls._load_times,
+            "access_count": cls._access_count
+        }
+
+# Para mantener compatibilidad con código existente, creamos un objeto modelos que simula el diccionario original
+class ModelsDict:
+    def __getitem__(self, key):
+        return ModelRegistry.get_model(key)
+    
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+    
+    def keys(self):
+        return MODEL_PATHS.keys()
+    
+    def items(self):
+        for key in MODEL_PATHS.keys():
+            yield key, ModelRegistry.get_model(key)
+
+# Reemplaza el diccionario de modelos con nuestro diccionario de carga perezosa
+modelos = ModelsDict()
 
 def predecir_sensores(datos, modelo):
     """
@@ -67,19 +148,15 @@ def predecir_sensores(datos, modelo):
     df_nuevo = pd.DataFrame(datos, columns=["valor"])
     return modelo.predict(df_nuevo).tolist()
 
-
-modelos = {
-    "corriente_motor": joblib.load(os.path.join(MODELS_DIR, "model_Corriente Motor Bomba Agua Alimentacion BFWP A (A).pkl")),
-    "mw_brutos_gas": joblib.load(os.path.join(MODELS_DIR, "model_MW Brutos de Generación Total Gas (MW).pkl")),
-    "presion_agua": joblib.load(os.path.join(MODELS_DIR, "model_Presión Agua Alimentación AP (barg).pkl")),
-    "salida_bomba": joblib.load(os.path.join(MODELS_DIR, "model_Salida de Bomba de Alta Presión.pkl")),
-    "temperatura_ambiental": joblib.load(os.path.join(MODELS_DIR, "model_Temperatura Ambiental (°C).pkl")),
-    "temp_descanso_bomba_1a": joblib.load(os.path.join(MODELS_DIR, "model_Temperatura Descanso Interno Bomba 1A (°C).pkl")),
-    "temp_descanso_empuje_bomba_1a": joblib.load(os.path.join(MODELS_DIR, "model_Temperatura Descanso Interno Empuje Bomba 1A (°C).pkl")),
-    "temp_descanso_motor_bomba_1a": joblib.load(os.path.join(MODELS_DIR, "model_Temperatura Descanso Interno Motor Bomba 1A (°C).pkl")),
-    "vibracion_axial_empuje": joblib.load(os.path.join(MODELS_DIR, "model_Vibración Axial Descanso Emp Bomba 1A (ms).pkl")),
-    "voltaje_barra": joblib.load(os.path.join(MODELS_DIR, "model_Voltaje Barra 6,6KV (V).pkl")),
-}
+# Versión optimizada para predicción de un solo valor con caché
+@lru_cache(maxsize=128)
+def predecir_sensores_optimizado(modelo_key, valor_tuple):
+    """
+    Versión optimizada con caché para predecir valores (debe recibir valores como tuplas)
+    """
+    modelo = ModelRegistry.get_model(modelo_key)
+    X = pd.DataFrame([valor_tuple], columns=["valor"])
+    return modelo.predict(X)[0]
 
 VENTANA_HORAS = 8  # horas
 
