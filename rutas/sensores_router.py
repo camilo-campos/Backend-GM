@@ -159,21 +159,141 @@ def contar_anomalias(db: Session, model_class, sensor_id: int) -> int:
         .scalar()
 
 
-def determinar_alerta(conteo: int, umbral_sensor_key: str) -> str:
+# Información detallada de cada sensor para mensajes más descriptivos
+SENSOR_INFO = {
+    'prediccion_corriente': {
+        'nombre': 'Corriente eléctrica',
+        'descripcion': 'Medición de corriente eléctrica del sistema',
+        'acciones': {
+            'AVISO': 'Verificar niveles de carga y distribución eléctrica',
+            'ALERTA': 'Revisar sobrecarga en sistemas eléctricos y reducir consumo si es posible',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla eléctrica. Activar protocolos de seguridad'
+        }
+    },
+    'prediccion_salida-agua': {
+        'nombre': 'Salida de agua',
+        'descripcion': 'Flujo de salida de agua del sistema',
+        'acciones': {
+            'AVISO': 'Verificar sistema de bombeo y niveles de presión',
+            'ALERTA': 'Revisar posibles obstrucciones y funcionamiento de válvulas',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla en sistema hidráulico'
+        }
+    },
+    'prediccion_presion-agua': {
+        'nombre': 'Presión de agua',
+        'descripcion': 'Nivel de presión en el sistema hidráulico',
+        'acciones': {
+            'AVISO': 'Verificar sistema de regulación de presión',
+            'ALERTA': 'Revisar posibles fugas o fallos en el sistema de presión',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de sobrepresión en el sistema hidráulico'
+        }
+    },
+    'prediccion_mw-brutos-gas': {
+        'nombre': 'MW brutos de gas',
+        'descripcion': 'Generación de potencia bruta por consumo de gas',
+        'acciones': {
+            'AVISO': 'Verificar eficiencia en la conversión de gas a potencia',
+            'ALERTA': 'Revisar sistema de combustión y suministro de gas',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla en sistema de generación'
+        }
+    },
+    'prediccion_temperatura-ambiental': {
+        'nombre': 'Temperatura ambiental',
+        'descripcion': 'Temperatura ambiente en la zona de operación',
+        'acciones': {
+            'AVISO': 'Verificar sistemas de ventilación y refrigeración',
+            'ALERTA': 'Activar sistemas adicionales de enfriamiento',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de sobrecalentamiento de equipos'
+        }
+    },
+    'prediccion_temp-descanso-bomba-1a': {
+        'nombre': 'Temperatura de descanso Bomba 1A',
+        'descripcion': 'Temperatura en rodamientos/descansos de la bomba 1A',
+        'acciones': {
+            'AVISO': 'Verificar sistema de lubricación y enfriamiento',
+            'ALERTA': 'Revisar desgaste y programar mantenimiento preventivo',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla mecánica en bomba 1A'
+        }
+    },
+    'prediccion_temp-empuje-bomba-1a': {
+        'nombre': 'Temperatura de empuje Bomba 1A',
+        'descripcion': 'Temperatura en el cojinete de empuje de la bomba 1A',
+        'acciones': {
+            'AVISO': 'Verificar alineación y lubricación',
+            'ALERTA': 'Revisar carga axial y sistema de enfriamiento',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla en sistema de empuje'
+        }
+    },
+    'prediccion_temp-motor-bomba-1a': {
+        'nombre': 'Temperatura del motor Bomba 1A',
+        'descripcion': 'Temperatura de operación del motor de la bomba 1A',
+        'acciones': {
+            'AVISO': 'Verificar ventilación y cargas de operación',
+            'ALERTA': 'Revisar sistema eléctrico y refrigeración del motor',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla del motor por sobrecalentamiento'
+        }
+    },
+    'prediccion_vibracion-axial': {
+        'nombre': 'Vibración axial',
+        'descripcion': 'Nivel de vibración axial en equipos rotativos',
+        'acciones': {
+            'AVISO': 'Verificar balanceo y alineación',
+            'ALERTA': 'Programar revisión mecánica por posible desbalanceo',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de daño estructural por vibraciones'
+        }
+    },
+    'prediccion_voltaje-barra': {
+        'nombre': 'Voltaje de barra',
+        'descripcion': 'Nivel de voltaje en las barras de distribución',
+        'acciones': {
+            'AVISO': 'Verificar estabilidad del suministro eléctrico',
+            'ALERTA': 'Revisar regulación de voltaje y protecciones',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de daño en equipos por fluctuaciones de voltaje'
+        }
+    }
+}
+
+def determinar_alerta(conteo: int, umbral_sensor_key: str) -> dict:
     """
-    Devuelve 'AVISO', 'ALERTA' o 'CRÍTICA' según umbrales.
+    Devuelve un diccionario con información completa de la alerta.
     """
     u = UMBRAL_SENSORES.get(umbral_sensor_key, {})
+    sensor_info = SENSOR_INFO.get(umbral_sensor_key, {
+        'nombre': umbral_sensor_key,
+        'descripcion': 'Sensor de monitoreo',
+        'acciones': {'AVISO': 'Verificar', 'ALERTA': 'Revisar', 'CRÍTICA': 'Intervenir'}
+    })
+    
+    nivel = None
+    porcentaje = 0
+    
     if conteo >= u.get("umbral_critica", float('inf')):
-        return "CRÍTICA"
-    if conteo >= u.get("umbral_alerta", float('inf')):
-        return "ALERTA"
-    if conteo >= u.get("umbral_minimo", float('inf')):
-        return "AVISO"
+        nivel = "CRÍTICA"
+        porcentaje = 100
+    elif conteo >= u.get("umbral_alerta", float('inf')):
+        nivel = "ALERTA"
+        porcentaje = 80
+    elif conteo >= u.get("umbral_minimo", float('inf')):
+        nivel = "AVISO"
+        porcentaje = 50
+    
+    if nivel:
+        return {
+            "nivel": nivel,
+            "nombre_sensor": sensor_info['nombre'],
+            "descripcion_sensor": sensor_info['descripcion'],
+            "accion_recomendada": sensor_info['acciones'].get(nivel, ""),
+            "porcentaje_umbral": porcentaje,
+            "conteo_anomalias": conteo
+        }
+    
     return None
 
 
 def nivel_numerico(nivel: str) -> int:
+    """Convierte el nivel textual a un valor numérico para comparaciones"""
+    if nivel and ':' in nivel:
+        nivel = nivel.split(':')[0].strip()
     return {"AVISO": 1, "ALERTA": 2, "CRÍTICA": 3}.get(nivel, 0)
 
 
@@ -203,22 +323,32 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
     lectura.tiempo_ejecucion = datetime.now(timezone.utc)
     db.commit()
 
-    # Si es anomalía, evaluamos niveles de alerta en base al contador almacenado
+        # Si es anomalía, evaluamos niveles de alerta en base al contador almacenado
     if clase == -1:
         conteo = lectura.contador_anomalias
-        nivel = determinar_alerta(conteo, umbral_key)
-        if nivel:
+        alerta_info = determinar_alerta(conteo, umbral_key)
+        if alerta_info:
+            # Buscar alerta previa para comparar nivel
             prev = db.query(Alerta) \
                      .filter(Alerta.sensor_id == sensor.id_sensor, Alerta.tipo_sensor == umbral_key) \
                      .order_by(Alerta.id.desc()) \
                      .first()
-            prev_n = nivel_numerico(prev.descripcion.split(':')[0]) if prev else 0
-            curr_n = nivel_numerico(nivel)
+            
+            # Obtener nivel numérico de alerta previa y actual
+            prev_n = nivel_numerico(prev.descripcion) if prev else 0
+            curr_n = nivel_numerico(alerta_info["nivel"])
+            
+            # Solo generar nueva alerta si el nivel ha aumentado
             if curr_n > prev_n:
+                # Construir mensaje descriptivo
+                mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']} - {alerta_info['conteo_anomalias']} anomalías consecutivas ({alerta_info['porcentaje_umbral']}% del umbral crítico)\n"
+                mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
+                mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
+                
                 alerta = Alerta(
                     sensor_id=sensor.id_sensor,
                     tipo_sensor=umbral_key,
-                    descripcion=f"{nivel}: {conteo} anomalías consecutivas"
+                    descripcion=mensaje
                 )
                 db.add(alerta)
                 db.commit()
