@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime , Text , func , ForeignKey
+from sqlalchemy import Column, Integer, Float, String, DateTime , Text , func , ForeignKey , Time , Date
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -127,3 +127,11 @@ class Bitacora(Base):
     bitacora = Column(Text, nullable=False)
     clasificacion = Column(Text, nullable=True)
     alerta_aviso = Column(Text, nullable=True)
+
+
+class PrediccionBombaA(Base):
+    __tablename__ = 'predicciones_bomba_a'  # Nombre exacto de la tabla
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    valor_prediccion = Column(Float, nullable=False)
+    hora_ejecucion = Column(Time, server_default=func.current_time())  # Tipo TIME con valor por defecto
+    dia_ejecucion = Column(Date, server_default=func.current_date())  # Tipo DATE con valor por defecto

@@ -1,15 +1,26 @@
-from fastapi import APIRouter, Depends , HTTPException
-from datetime import datetime, timedelta
-from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query
+from datetime import datetime, timedelta, timezone
 import numpy as np
-from typing import Optional
-from fastapi import Query
-from datetime import datetime
+from typing import List, Optional
 from sqlalchemy import func
-from esquemas.esquema import SensorInput
 from sqlalchemy.orm import Session
+
+from esquemas.esquema import SensorInput, PrediccionBombaInput, PrediccionBombaOutput, PrediccionBombaResponse
 from modelos.database import get_db
-from modelos.modelos import  Alerta, SensorCorriente, SensorPresionAgua, SensorSalidaAgua , SensorMw_brutos_generacion_gas , SensorTemperatura_Ambiental , SensorTemperatura_descanso_interna_empuje_bomba_1aa , SensorTemperatura_descanso_interna_motor_bomba_1a , SensorTemperatura_descanso_interno_bomba_1a ,SensorVibracion_axial_descanso ,SensorVoltaje_barra
+from modelos.modelos import (
+    Alerta, 
+    SensorCorriente, 
+    SensorPresionAgua, 
+    SensorSalidaAgua,
+    SensorMw_brutos_generacion_gas,
+    SensorTemperatura_Ambiental,
+    SensorTemperatura_descanso_interna_empuje_bomba_1aa,
+    SensorTemperatura_descanso_interna_motor_bomba_1a,
+    SensorTemperatura_descanso_interno_bomba_1a,
+    SensorVibracion_axial_descanso,
+    SensorVoltaje_barra,
+    PrediccionBombaA
+)
 
 router = APIRouter(prefix="/sensores", tags=["Sensores"])
 
@@ -440,6 +451,100 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
 
 
 # ————— Rutas Post —————
+
+@router.post("/predecir-bomba", response_model=PrediccionBombaOutput)
+async def predecir_bomba(
+    datos: PrediccionBombaInput,
+    db: Session = Depends(get_db)
+):
+    """
+    Realiza una predicción utilizando el modelo Random Forest para la bomba.
+    
+    Parámetros:
+    - datos: Objeto con los valores de entrada para el modelo
+    
+    Retorna:
+    - prediccion: Valor predicho por el modelo
+    - status: Estado de la operación
+    """
+    try:
+        # Ruta al modelo
+        model_path = os.path.join("modelos_prediccion", "bm_randomforest.pkl")
+        print(model_path)
+        # Cargar el modelo
+        model = joblib.load(model_path)
+        print(model)
+        
+        # Preparar los datos en el orden correcto para el modelo
+        input_data = pd.DataFrame([{
+    'Presión Agua Alimentación AP (barg)': datos.presion_agua,
+    'Voltaje Barra 6,6KV (V)': datos.voltaje_barra,
+    'Corriente Motor Bomba Agua Alimentacion BFWP A (A)': datos.corriente_motor,
+    'Vibración Axial Descanso Emp Bomba 1A (ms)': datos.vibracion_axial,
+    'Salida de Bomba de Alta Presión': datos.salida_bomba,
+    'Flujo de Agua Atemperación Vapor Alta AP SH (kg/h)': datos.flujo_agua,
+    'MW Brutos de Generación Total Gas (MW)': datos.mw_brutos_gas,
+    'Temperatura Descanso Interno Motor Bomba 1A (°C)': datos.temp_motor,
+    'Temperatura Descanso Interno Bomba 1A (°C)': datos.temp_bomba,
+    'Temperatura Descanso Interno Empuje Bomba 1A (°C)': datos.temp_empuje,
+    'Temperatura Ambiental (°C)': datos.temp_ambiental
+}])
+        print(input_data)
+        # Realizar la predicción
+        prediccion = model.predict(input_data)
+        print(prediccion)
+        # Obtener la hora y fecha actual
+        ahora = datetime.now()
+        hora_actual = ahora.strftime("%H:%M:%S")
+        dia_actual = ahora.strftime("%Y-%m-%d")
+        
+        # Guardar la predicción en la base de datos
+        nueva_prediccion = PrediccionBombaA(
+            valor_prediccion=float(prediccion[0]),
+            hora_ejecucion=hora_actual,
+            dia_ejecucion=dia_actual
+        )
+        
+        db.add(nueva_prediccion)
+        db.commit()
+        
+        # Retornar la predicción
+        return {
+            "prediccion": float(prediccion[0]),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error al realizar la predicción: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al realizar la predicción: {str(e)}"
+        )
+
+
+@router.get("/predicciones-bomba-a", response_model=List[PrediccionBombaResponse])
+async def obtener_predicciones_bomba(
+    db: Session = Depends(get_db),
+    limite: int = Query(40, description="Número de registros a devolver (máx 100)", le=100, ge=1)
+):
+    """
+    Obtiene las últimas predicciones de la bomba.
+    """
+    try:
+        # Consulta directa con ordenamiento y límite
+        predicciones = db.query(PrediccionBombaA)\
+                        .order_by(PrediccionBombaA.id.desc())\
+                        .limit(limite)\
+                        .all()
+        predicciones = list(reversed(predicciones))  # Ahora los más antiguos primero
+        logger.info(f"Registros encontrados: {len(predicciones)}")
+        return predicciones
+        
+    except Exception as e:
+        logger.error(f"Error al obtener predicciones: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/prediccion_corriente")
 async def predecir_corriente(sensor: SensorInput, db: Session = Depends(get_db)):
