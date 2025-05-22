@@ -129,6 +129,16 @@ class Bitacora(Base):
     alerta_aviso = Column(Text, nullable=True)
 
 
+class BitacoraB(Base):
+    __tablename__ = 'bitacoras_b'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now(), nullable=False)
+    bitacora = Column(Text, nullable=False)
+    clasificacion = Column(Text, nullable=True)
+    alerta_aviso = Column(Text, nullable=True)
+
+
 class PrediccionBombaA(Base):
     __tablename__ = 'predicciones_bomba_a'  # Nombre exacto de la tabla
     id = Column(Integer, primary_key=True, autoincrement=True)
