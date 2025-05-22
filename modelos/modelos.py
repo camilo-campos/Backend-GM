@@ -135,3 +135,114 @@ class PrediccionBombaA(Base):
     valor_prediccion = Column(Float, nullable=False)
     hora_ejecucion = Column(Time, server_default=func.current_time())  # Tipo TIME con valor por defecto
     dia_ejecucion = Column(Date, server_default=func.current_date())  # Tipo DATE con valor por defecto
+
+
+# Clases para los modelos adicionales
+class SensorExcentricidadBomba(Base):
+    __tablename__ = 'excentricidad_bomba'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoAguaDomoAP(Base):
+    __tablename__ = 'flujo_agua_domo_ap'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoAguaDomoMP(Base):
+    __tablename__ = 'flujo_agua_domo_mp'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoAguaRecalentador(Base):
+    __tablename__ = 'flujo_agua_recalentador'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoAguaVaporAlta(Base):
+    __tablename__ = 'flujo_agua_vapor_alta'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorPosicionValvulaRecirc(Base):
+    __tablename__ = 'posicion_valvula_recirc'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorPresionAguaMP(Base):
+    __tablename__ = 'presion_agua_mp'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorPresionSuccionBAA(Base):
+    __tablename__ = 'presion_succion_baa'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorTemperaturaEstator(Base):
+    __tablename__ = 'temperatura_estator'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoSalida12FPMFC(Base):
+    __tablename__ = 'flujo_salida_12fpmfc'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
+    tiempo_sensor = Column(String)  # Hora / minuto del sensor
+    valor_sensor = Column(Float)  # Valor del sensor
+    clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
+    contador_anomalias = Column(Integer, default=0)

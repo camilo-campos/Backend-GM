@@ -7,23 +7,15 @@ from sqlalchemy.orm import Session
 
 from esquemas.esquema import SensorInput, PrediccionBombaInput, PrediccionBombaOutput, PrediccionBombaResponse
 from modelos.database import get_db
-from modelos.modelos import (
-    Alerta, 
-    SensorCorriente, 
-    SensorPresionAgua, 
-    SensorSalidaAgua,
-    SensorMw_brutos_generacion_gas,
-    SensorTemperatura_Ambiental,
-    SensorTemperatura_descanso_interna_empuje_bomba_1aa,
-    SensorTemperatura_descanso_interna_motor_bomba_1a,
-    SensorTemperatura_descanso_interno_bomba_1a,
-    SensorVibracion_axial_descanso,
-    SensorVoltaje_barra,
-    PrediccionBombaA
-)
+from modelos.modelos import (SensorCorriente, SensorSalidaAgua, SensorPresionAgua, SensorMw_brutos_generacion_gas,
+                          SensorTemperatura_Ambiental, SensorTemperatura_descanso_interna_empuje_bomba_1aa,
+                          SensorTemperatura_descanso_interna_motor_bomba_1a, SensorTemperatura_descanso_interno_bomba_1a,
+                          SensorVibracion_axial_descanso, SensorVoltaje_barra, PrediccionBombaA, Alerta, Bitacora,
+                          SensorExcentricidadBomba, SensorFlujoAguaDomoAP, SensorFlujoAguaDomoMP,
+                          SensorFlujoAguaRecalentador, SensorFlujoAguaVaporAlta, SensorPosicionValvulaRecirc,
+                          SensorPresionAguaMP, SensorPresionSuccionBAA, SensorTemperaturaEstator, SensorFlujoSalida12FPMFC)
 
 router = APIRouter(prefix="/sensores", tags=["Sensores"])
-
 
 
 # Datos por defecto
@@ -79,16 +71,29 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "modelos_prediccion")  # Ruta absoluta
 
 # Mapa de claves de modelo a rutas de archivo
 MODEL_PATHS = {
-    "corriente_motor": "model_Corriente Motor Bomba Agua Alimentacion BFWP A (A).pkl",
-    "mw_brutos_gas": "model_MW Brutos de Generación Total Gas (MW).pkl",
-    "presion_agua": "model_Presión Agua Alimentación AP (barg).pkl",
-    "salida_bomba": "model_Salida de Bomba de Alta Presión.pkl",
-    "temperatura_ambiental": "model_Temperatura Ambiental (°C).pkl",
-    "temp_descanso_bomba_1a": "model_Temperatura Descanso Interno Bomba 1A (°C).pkl",
-    "temp_descanso_empuje_bomba_1a": "model_Temperatura Descanso Interno Empuje Bomba 1A (°C).pkl",
-    "temp_descanso_motor_bomba_1a": "model_Temperatura Descanso Interno Motor Bomba 1A (°C).pkl",
-    "vibracion_axial_empuje": "model_Vibración Axial Descanso Emp Bomba 1A (ms).pkl",
-    "voltaje_barra": "model_Voltaje Barra 6,6KV (V).pkl",
+    # Modelos originales actualizados
+    "corriente_motor": "Corriente_MTR_BBA_Agua_Alim_1A.pkl",
+    "mw_brutos_gas": "bm_randomforest.pkl",
+    "presion_agua": "Presi_n_Agua_Alimentacion_Econ._AP.pkl",
+    "salida_bomba": "Temperatura_descarga_Bba_Agua_Alim_1A.pkl",
+    "temperatura_ambiental": "Temp_Ambiental.pkl",
+    "temp_descanso_bomba_1a": "Vibracion_X_Descanso_Interno_Bomba_1A_A.pkl",
+    "temp_descanso_empuje_bomba_1a": "Vibracion_Y_Descanso_Interno_Bomba_1A_B.pkl",
+    "temp_descanso_motor_bomba_1a": "Temperatura_Descanso_Interno_MTR_Bomba_1A.pkl",
+    "vibracion_axial_empuje": "Vibracion_Axial_Descanso_Empuje_Bomba_1A.pkl",
+    "voltaje_barra": "Voltaje_Barra_6_6KV.pkl",
+    
+    # Modelos adicionales
+    "excentricidad_bomba": "Excentricidad_Bomba_1A.pkl",
+    "flujo_agua_domo_ap": "Flujo_de_Agua_Alimentacion_Domo_AP_Compensated_18B.pkl",
+    "flujo_agua_domo_mp": "Flujo_de_Agua_Alimentacion_Domo_MP_Compensated_16B.pkl",
+    "flujo_agua_recalentador": "Flujo_de_Agua_Atemp_Recale_Calient_RH.pkl",
+    "flujo_agua_vapor_alta": "Flujo_de_Agua_Atemp_Vapor_Alta_AP_SH.pkl",
+    "posicion_valvula_recirc": "Posicion_v_lvula_recirc_BAA_AE01A.pkl",
+    "presion_agua_mp": "Presion_Agua_Alimentacion_Econ._MP.pkl",
+    "presion_succion_baa": "Presion_succion_BAA_AE01A.pkl",
+    "temperatura_estator": "Temperatura_Estator_MTR_BBA_AA_1A_A.pkl",
+    "flujo_salida_12fpmfc": "12FPMFC.1B.OUT.pkl",
 }
 
 class ModelRegistry:
@@ -338,6 +343,97 @@ SENSOR_INFO = {
             'ALERTA': 'Revisar regulación de voltaje y protecciones',
             'CRÍTICA': 'Intervención inmediata: Riesgo de daño en equipos por fluctuaciones de voltaje'
         }
+    },
+    # Nuevos sensores
+    'prediccion_excentricidad-bomba': {
+        'nombre': 'Excentricidad Bomba 1A',
+        'descripcion': 'Medición de excentricidad en la bomba 1A',
+        'acciones': {
+            'AVISO': 'Verificar alineación y balanceo del rotor',
+            'ALERTA': 'Revisar desgaste en cojinetes y programar mantenimiento',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla catastrófica por desalineación'
+        }
+    },
+    'prediccion_flujo-agua-domo-ap': {
+        'nombre': 'Flujo de Agua Domo AP',
+        'descripcion': 'Flujo de agua de alimentación al domo de alta presión',
+        'acciones': {
+            'AVISO': 'Verificar sistema de control de flujo y válvulas',
+            'ALERTA': 'Revisar posibles obstrucciones o fallos en bombas de alimentación',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de sobrecalentamiento en domo AP'
+        }
+    },
+    'prediccion_flujo-agua-domo-mp': {
+        'nombre': 'Flujo de Agua Domo MP',
+        'descripcion': 'Flujo de agua de alimentación al domo de media presión',
+        'acciones': {
+            'AVISO': 'Verificar sistema de control de flujo y niveles',
+            'ALERTA': 'Revisar funcionamiento de válvulas y sistema de bombeo',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de operación inadecuada del domo MP'
+        }
+    },
+    'prediccion_flujo-agua-recalentador': {
+        'nombre': 'Flujo de Agua Recalentador',
+        'descripcion': 'Flujo de agua para atemperación del recalentador',
+        'acciones': {
+            'AVISO': 'Verificar sistema de control de temperatura',
+            'ALERTA': 'Revisar posibles fugas o bloqueos en sistema de atemperación',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de sobrecalentamiento en recalentador'
+        }
+    },
+    'prediccion_flujo-agua-vapor-alta': {
+        'nombre': 'Flujo de Agua Vapor Alta',
+        'descripcion': 'Flujo de agua para atemperación de vapor de alta presión',
+        'acciones': {
+            'AVISO': 'Verificar sistema de control de temperatura del vapor',
+            'ALERTA': 'Revisar válvulas de atemperación y sensores de temperatura',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de daño en turbina por temperatura excesiva'
+        }
+    },
+    'prediccion_posicion-valvula-recirc': {
+        'nombre': 'Posición Válvula Recirculación',
+        'descripcion': 'Posición de la válvula de recirculación de la bomba de agua de alimentación',
+        'acciones': {
+            'AVISO': 'Verificar sistema de control de la válvula',
+            'ALERTA': 'Revisar actuador y posibles fugas en la válvula',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de cavitación en bomba por flujo inadecuado'
+        }
+    },
+    'prediccion_presion-agua-mp': {
+        'nombre': 'Presión Agua MP',
+        'descripcion': 'Presión del agua de alimentación en el economizador de media presión',
+        'acciones': {
+            'AVISO': 'Verificar sistema de control de presión',
+            'ALERTA': 'Revisar posibles fugas o restricciones en tuberías',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de daño en economizador por presión anormal'
+        }
+    },
+    'prediccion_presion-succion-baa': {
+        'nombre': 'Presión Succión BAA',
+        'descripcion': 'Presión en la succión de la bomba de agua de alimentación',
+        'acciones': {
+            'AVISO': 'Verificar nivel en tanque de agua de alimentación',
+            'ALERTA': 'Revisar posibles restricciones en línea de succión',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de cavitación y daño en bomba'
+        }
+    },
+    'prediccion_temperatura-estator': {
+        'nombre': 'Temperatura Estator',
+        'descripcion': 'Temperatura del estator del motor de la bomba de agua de alimentación',
+        'acciones': {
+            'AVISO': 'Verificar sistema de refrigeración del motor',
+            'ALERTA': 'Revisar carga del motor y sistema de ventilación',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla en aislamiento del motor'
+        }
+    },
+    'prediccion_flujo-salida-12fpmfc': {
+        'nombre': 'Flujo Salida 12FPMFC',
+        'descripcion': 'Flujo de salida en el medidor de flujo 12FPMFC',
+        'acciones': {
+            'AVISO': 'Verificar calibración del medidor de flujo',
+            'ALERTA': 'Revisar posibles obstrucciones o fallos en el sistema',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de operación inadecuada por medición incorrecta'
+        }
     }
 }
 
@@ -586,6 +682,47 @@ async def predecir_vibracion(sensor: SensorInput, db: Session = Depends(get_db))
 async def predecir_voltaje(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="voltaje_barra", umbral_key="prediccion_voltaje-barra", model_class=SensorVoltaje_barra)
 
+# Rutas POST para los nuevos sensores
+@router.post("/prediccion_excentricidad-bomba")
+async def predecir_excentricidad_bomba(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="excentricidad_bomba", umbral_key="prediccion_excentricidad-bomba", model_class=SensorExcentricidadBomba)
+
+@router.post("/prediccion_flujo-agua-domo-ap")
+async def predecir_flujo_agua_domo_ap(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_agua_domo_ap", umbral_key="prediccion_flujo-agua-domo-ap", model_class=SensorFlujoAguaDomoAP)
+
+@router.post("/prediccion_flujo-agua-domo-mp")
+async def predecir_flujo_agua_domo_mp(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_agua_domo_mp", umbral_key="prediccion_flujo-agua-domo-mp", model_class=SensorFlujoAguaDomoMP)
+
+@router.post("/prediccion_flujo-agua-recalentador")
+async def predecir_flujo_agua_recalentador(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_agua_recalentador", umbral_key="prediccion_flujo-agua-recalentador", model_class=SensorFlujoAguaRecalentador)
+
+@router.post("/prediccion_flujo-agua-vapor-alta")
+async def predecir_flujo_agua_vapor_alta(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_agua_vapor_alta", umbral_key="prediccion_flujo-agua-vapor-alta", model_class=SensorFlujoAguaVaporAlta)
+
+@router.post("/prediccion_posicion-valvula-recirc")
+async def predecir_posicion_valvula_recirc(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="posicion_valvula_recirc", umbral_key="prediccion_posicion-valvula-recirc", model_class=SensorPosicionValvulaRecirc)
+
+@router.post("/prediccion_presion-agua-mp")
+async def predecir_presion_agua_mp(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="presion_agua_mp", umbral_key="prediccion_presion-agua-mp", model_class=SensorPresionAguaMP)
+
+@router.post("/prediccion_presion-succion-baa")
+async def predecir_presion_succion_baa(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="presion_succion_baa", umbral_key="prediccion_presion-succion-baa", model_class=SensorPresionSuccionBAA)
+
+@router.post("/prediccion_temperatura-estator")
+async def predecir_temperatura_estator(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temperatura_estator", umbral_key="prediccion_temperatura-estator", model_class=SensorTemperaturaEstator)
+
+@router.post("/prediccion_flujo-salida-12fpmfc")
+async def predecir_flujo_salida_12fpmfc(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_salida_12fpmfc", umbral_key="prediccion_flujo-salida-12fpmfc", model_class=SensorFlujoSalida12FPMFC)
+
 
 
 
@@ -729,6 +866,87 @@ async def get_sensores_voltaje_barra(
 ):
     return await _get_and_classify(db, SensorVoltaje_barra, "voltaje_barra", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
 
+# Rutas GET para los nuevos sensores
+@router.get("/excentricidad-bomba")
+async def get_sensores_excentricidad_bomba(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorExcentricidadBomba, "excentricidad_bomba", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/flujo-agua-domo-ap")
+async def get_sensores_flujo_agua_domo_ap(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoAguaDomoAP, "flujo_agua_domo_ap", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/flujo-agua-domo-mp")
+async def get_sensores_flujo_agua_domo_mp(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoAguaDomoMP, "flujo_agua_domo_mp", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/flujo-agua-recalentador")
+async def get_sensores_flujo_agua_recalentador(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoAguaRecalentador, "flujo_agua_recalentador", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/flujo-agua-vapor-alta")
+async def get_sensores_flujo_agua_vapor_alta(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoAguaVaporAlta, "flujo_agua_vapor_alta", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/posicion-valvula-recirc")
+async def get_sensores_posicion_valvula_recirc(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorPosicionValvulaRecirc, "posicion_valvula_recirc", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/presion-agua-mp")
+async def get_sensores_presion_agua_mp(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorPresionAguaMP, "presion_agua_mp", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/presion-succion-baa")
+async def get_sensores_presion_succion_baa(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorPresionSuccionBAA, "presion_succion_baa", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/temperatura-estator")
+async def get_sensores_temperatura_estator(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaEstator, "temperatura_estator", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
+@router.get("/flujo-salida-12fpmfc")
+async def get_sensores_flujo_salida_12fpmfc(
+    inicio: Optional[str] = Query(None), 
+    termino: Optional[str] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoSalida12FPMFC, "flujo_salida_12fpmfc", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+
 
 # Obtener los rangos de tiempo de cada tabla 
 
@@ -762,34 +980,3 @@ async def rango_corriente(db: Session = Depends(get_db)):
 async def rango_salida_agua(db: Session = Depends(get_db)):
     return _get_range(db, SensorSalidaAgua)
 
-@router.get("/presion-agua/rango")
-async def rango_presion_agua(db: Session = Depends(get_db)):
-    return _get_range(db, SensorPresionAgua)
-
-@router.get("/generacion-gas/rango")
-async def rango_generacion_gas(db: Session = Depends(get_db)):
-    return _get_range(db, SensorMw_brutos_generacion_gas)
-
-@router.get("/temperatura-ambiental/rango")
-async def rango_temperatura_ambiental(db: Session = Depends(get_db)):
-    return _get_range(db, SensorTemperatura_Ambiental)
-
-@router.get("/temperatura-interna-empuje/rango")
-async def rango_temp_interna_empuje(db: Session = Depends(get_db)):
-    return _get_range(db, SensorTemperatura_descanso_interna_empuje_bomba_1aa)
-
-@router.get("/temperatura-descanso-motor/rango")
-async def rango_temp_descanso_motor(db: Session = Depends(get_db)):
-    return _get_range(db, SensorTemperatura_descanso_interna_motor_bomba_1a)
-
-@router.get("/temperatura-descanso-bomba/rango")
-async def rango_temp_descanso_bomba(db: Session = Depends(get_db)):
-    return _get_range(db, SensorTemperatura_descanso_interno_bomba_1a)
-
-@router.get("/vibracion-axial/rango")
-async def rango_vibracion_axial(db: Session = Depends(get_db)):
-    return _get_range(db, SensorVibracion_axial_descanso)
-
-@router.get("/voltaje-barra/rango")
-async def rango_voltaje_barra(db: Session = Depends(get_db)):
-    return _get_range(db, SensorVoltaje_barra)
