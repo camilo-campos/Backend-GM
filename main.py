@@ -6,6 +6,7 @@ from rutas.sensores_router import router as sensores_router
 from rutas.alertas_umbral import router as alertas_router 
 from rutas.bitacoras_router import router as bitacoras_router
 from rutas.bitacoras_router_b import router as bitacoras_router_b
+from rutas.sensores_router_B import router_b as sensores_router_b
 from modelos.database import engine, Base, SessionLocal
 
 
@@ -36,6 +37,7 @@ app.include_router(sensores_router)
 app.include_router(bitacoras_router)
 app.include_router(bitacoras_router_b)
 app.include_router(alertas_router)
+app.include_router(sensores_router_b)
 
 
 
