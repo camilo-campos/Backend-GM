@@ -2,18 +2,18 @@ from fastapi import APIRouter, Depends , HTTPException
 from datetime import datetime, timedelta
 from datetime import datetime, timezone
 import numpy as np
-from typing import Optional
+from typing import Optional , List
 from fastapi import Query
 from datetime import datetime
 from sqlalchemy import func
-from esquemas.esquema import SensorInput
+from esquemas.esquema import SensorInput , PrediccionBombaResponse 
 from sqlalchemy.orm import Session
 from modelos.database import get_db
 from modelos_b.modelos_b import (Alerta, SensorCorriente, SensorExcentricidadBomba, SensorFlujoDescarga,
     SensorFlujoAguaDomoAP, SensorFlujoAguaDomoMP, SensorFlujoAguaRecalentador, SensorFlujoAguaVaporAlta,
     SensorPresionAgua, SensorTemperaturaAmbiental, SensorTemperaturaAguaAlim, SensorTemperaturaEstator,
     SensorVibracionAxialEmpuje, SensorVibracionXDescanso, SensorVibracionYDescanso, SensorVoltajeBarra,
-    PrediccionBombaB)
+    PrediccionBombaB )
 
 router_b = APIRouter(prefix="/sensores_b", tags=["Sensores_b"])
 
@@ -805,7 +805,39 @@ async def _get_and_classify(
         })
     return salida
 
+
 # Rutas
+@router_b.get("/predicciones-bomba-b", response_model=List[PrediccionBombaResponse])
+async def obtener_predicciones_bomba(
+    db: Session = Depends(get_db),
+    limite: int = Query(40, description="Número de registros a devolver (máx 100)", le=100, ge=1)
+):
+    """
+    Obtiene las últimas predicciones de la bomba.
+    """
+    try:
+        # Consulta directa con ordenamiento y límite
+        predicciones = db.query(PrediccionBombaB)\
+                        .order_by(PrediccionBombaB.id.desc())\
+                        .limit(limite)\
+                        .all()
+        predicciones = list(reversed(predicciones))  # Ahora los más antiguos primero
+        logger.info(f"Registros encontrados: {len(predicciones)}")
+        return predicciones
+        
+    except Exception as e:
+        logger.error(f"Error al obtener predicciones: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+
+
+
+
+
 @router_b.get("/corriente")
 async def get_sensores_corriente(
     inicio: Optional[str] = Query(None), 

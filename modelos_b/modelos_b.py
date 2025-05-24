@@ -27,6 +27,10 @@ class SensorCorriente(Base):
     contador_anomalias = Column(Integer, default=0)
 
 
+
+
+
+
 class SensorExcentricidadBomba(Base):
     __tablename__ = 'excentricidad_bomba_b'
     
