@@ -254,81 +254,81 @@ VENTANA_HORAS = 8  # horas
 UMBRAL_SENSORES = {
     # Sensores existentes con nombres corregidos
     'prediccion_corriente': {
-        "umbral_minimo": 101,  # 50% de 202
-        "umbral_alerta": 162,   # 80% de 202
-        "umbral_critica": 202,
+        "umbral_minimo": 54,  # 50% de 108
+        "umbral_alerta": 86,   # 80% de 108
+        "umbral_critica": 108,
     },
     'prediccion_presion_agua': {  # Corregido de prediccion_presion-agua
-        "umbral_minimo": 118,  # 50% de 235
-        "umbral_alerta": 188,  # 80% de 235
-        "umbral_critica": 235,
+        "umbral_minimo": 25,  # 50% de 51
+        "umbral_alerta": 41,  # 80% de 51
+        "umbral_critica": 51,
     },
     'prediccion_temperatura_ambiental': {  # Corregido de prediccion_temperatura-ambiental
-        "umbral_minimo": 14,   # 50% de 28
-        "umbral_alerta": 22,  # 80% de 28
-        "umbral_critica": 28,
+        "umbral_minimo": 1,   # 50% de 2
+        "umbral_alerta": 2,  # 80% de 2
+        "umbral_critica": 2,
     },
     
     # Nuevos sensores
     'prediccion_excentricidad_bomba': {
-        "umbral_minimo": 25,   # 50% de 50
-        "umbral_alerta": 40,   # 80% de 50
-        "umbral_critica": 50,
+        "umbral_minimo": 0,   # 50% de 0
+        "umbral_alerta": 0,   # 80% de 0
+        "umbral_critica": 0,
     },
     'prediccion_flujo_descarga': {
-        "umbral_minimo": 60,   # 50% de 120
-        "umbral_alerta": 96,   # 80% de 120
-        "umbral_critica": 120,
+        "umbral_minimo": 66,   # 50% de 132
+        "umbral_alerta": 105,   # 80% de 132
+        "umbral_critica": 132,
     },
     'prediccion_flujo_agua_domo_ap': {
-        "umbral_minimo": 50,   # 50% de 100
-        "umbral_alerta": 80,   # 80% de 100
-        "umbral_critica": 100,
+        "umbral_minimo": 39,   # 50% de 78
+        "umbral_alerta": 63,   # 80% de 78
+        "umbral_critica": 78,
     },
     'prediccion_flujo_agua_domo_mp': {
-        "umbral_minimo": 45,   # 50% de 90
-        "umbral_alerta": 72,   # 80% de 90
-        "umbral_critica": 90,
+        "umbral_minimo": 22,   # 50% de 45
+        "umbral_alerta": 36,   # 80% de 45
+        "umbral_critica": 45,
     },
     'prediccion_flujo_agua_recalentador': {
-        "umbral_minimo": 40,   # 50% de 80
-        "umbral_alerta": 64,   # 80% de 80
-        "umbral_critica": 80,
+        "umbral_minimo": 45,   # 50% de 91
+        "umbral_alerta": 73,   # 80% de 91
+        "umbral_critica": 91,
     },
     'prediccion_flujo_agua_vapor_alta': {
-        "umbral_minimo": 55,   # 50% de 110
-        "umbral_alerta": 88,   # 80% de 110
-        "umbral_critica": 110,
+        "umbral_minimo": 13,   # 50% de 26
+        "umbral_alerta": 21,   # 80% de 26
+        "umbral_critica": 26,
     },
     'prediccion_temperatura_agua_alim': {
-        "umbral_minimo": 35,   # 50% de 70
-        "umbral_alerta": 56,   # 80% de 70
-        "umbral_critica": 70,
+        "umbral_minimo": 16,   # 50% de 32
+        "umbral_alerta": 26,   # 80% de 32
+        "umbral_critica": 32,
     },
     'prediccion_temperatura_estator': {
-        "umbral_minimo": 45,   # 50% de 90
-        "umbral_alerta": 72,   # 80% de 90
-        "umbral_critica": 90,
+        "umbral_minimo": 36,   # 50% de 73
+        "umbral_alerta": 58,   # 80% de 73
+        "umbral_critica": 73,
     },
     'prediccion_vibracion_axial_empuje': {
-        "umbral_minimo": 15,   # 50% de 30
-        "umbral_alerta": 24,   # 80% de 30
-        "umbral_critica": 30,
+        "umbral_minimo": 52,   # 50% de 104
+        "umbral_alerta": 83,   # 80% de 104
+        "umbral_critica": 104,
     },
     'prediccion_vibracion_x_descanso': {
-        "umbral_minimo": 10,   # 50% de 20
-        "umbral_alerta": 16,   # 80% de 20
-        "umbral_critica": 20,
+        "umbral_minimo": 67,   # 50% de 133
+        "umbral_alerta": 106,   # 80% de 133
+        "umbral_critica": 133,
     },
     'prediccion_vibracion_y_descanso': {
-        "umbral_minimo": 10,   # 50% de 20
-        "umbral_alerta": 16,   # 80% de 20
-        "umbral_critica": 20,
+        "umbral_minimo": 54,   # 50% de 107
+        "umbral_alerta": 86,   # 80% de 107
+        "umbral_critica": 107,
     },
     'prediccion_voltaje_barra': {
-        "umbral_minimo": 125,  # 50% de 250
-        "umbral_alerta": 200,  # 80% de 250
-        "umbral_critica": 250,
+        "umbral_minimo": 18,  # 50% de 35
+        "umbral_alerta": 28,  # 80% de 35
+        "umbral_critica": 35,
     },
     'prediccion_temp-descanso-bomba-1a': {
         "umbral_minimo": 86,  # 50% de 171
@@ -351,9 +351,9 @@ UMBRAL_SENSORES = {
         "umbral_critica": 58,
     },
     'prediccion_voltaje-barra': {
-        "umbral_minimo": 18,   # 50% de 36
-        "umbral_alerta": 29,  # 80% de 36
-        "umbral_critica": 36,
+        "umbral_minimo": 18,   # 50% de 35
+        "umbral_alerta": 28,  # 80% de 35
+        "umbral_critica": 35,
     }
 }
 
