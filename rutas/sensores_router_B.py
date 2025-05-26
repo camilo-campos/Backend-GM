@@ -6,7 +6,7 @@ from typing import Optional , List
 from fastapi import Query
 from datetime import datetime
 from sqlalchemy import func
-from esquemas.esquema import SensorInput , PrediccionBombaResponse 
+from esquemas.esquema import SensorInput, PrediccionBombaResponse, PrediccionBombaBInput, PrediccionBombaBOutput
 from sqlalchemy.orm import Session
 from modelos.database import get_db
 from modelos_b.modelos_b import (Alerta, SensorCorriente, SensorExcentricidadBomba, SensorFlujoDescarga,
@@ -804,6 +804,87 @@ async def _get_and_classify(
             "tiempo_ejecucion": s.tiempo_ejecucion.isoformat() if s.tiempo_ejecucion else None
         })
     return salida
+
+
+# ————— Rutas Post para Predicción de Bomba B —————
+
+@router_b.post("/predecir-bomba-b", response_model=PrediccionBombaBOutput)
+async def predecir_bomba_b(
+    datos: PrediccionBombaBInput,
+    db: Session = Depends(get_db)
+):
+    """
+    Realiza una predicción utilizando el modelo Random Forest para la bomba B.
+    
+    Parámetros:
+    - datos: Objeto con los valores de entrada para el modelo
+    
+    Retorna:
+    - prediccion: Valor predicho por el modelo
+    - status: Estado de la operación
+    """
+    try:
+        # Obtener el modelo usando ModelRegistry
+        logger.info("Obteniendo modelo para predicción de bomba B")
+        # La clave que usaremos es una especial, ya que este modelo no está en el diccionario normal
+        # Así que tendremos que cargar el archivo directamente
+        model_path = os.path.join(MODELS_DIR, "bm_randomforest_bomba_b.pkl")
+        model = joblib.load(model_path)
+        
+        # Preparar los datos en el orden correcto para el modelo
+        input_data = pd.DataFrame([{
+            # Campos para la bomba B
+            'Corriente Motor Bomba Agua Alimentacion 1B': datos.corriente_motor,
+            'Excentricidad Bomba 1B': datos.excentricidad_bomba,
+            'Flujo Descarga AP BAA AE01B': datos.flujo_descarga_ap,
+            'Flujo de Agua Alimentación Domo AP Compensated': datos.flujo_agua_domo_ap,
+            'Flujo de Agua Alimentación Domo MP Compensated': datos.flujo_agua_domo_mp,
+            'Flujo de Agua Atemperación Recalentador': datos.flujo_agua_recalentador,
+            'Flujo de Agua Atemperación Vapor Alta AP SH': datos.flujo_agua_vapor_alta,
+            'Presión Agua Alimentación Economizador AP': datos.presion_agua_ap,
+            'Temperatura Ambiental': datos.temperatura_ambiental,
+            'Temperatura Agua Alimentación AP': datos.temperatura_agua_alim_ap,
+            'Temperatura Estator Motor Bomba AA 1B': datos.temperatura_estator,
+            'Vibración Axial Descanso Empuje Bomba 1B': datos.vibracion_axial,
+            'Vibración X Descanso Interno Bomba 1B': datos.vibracion_x_descanso,
+            'Vibración Y Descanso Interno Bomba 1B': datos.vibracion_y_descanso,
+            'Voltaje Barra 6.6KV': datos.voltaje_barra
+        }])
+        
+        logger.info(f"DataFrame de entrada preparado con shape: {input_data.shape}")
+        
+        # Realizar la predicción
+        prediccion = model.predict(input_data)
+        logger.info(f"Predicción realizada: {prediccion[0]}")
+        
+        # Obtener la hora y fecha actual
+        ahora = datetime.now(timezone.utc)
+        hora_actual = ahora.strftime("%H:%M:%S")
+        dia_actual = ahora.strftime("%Y-%m-%d")
+        
+        # Guardar la predicción en la base de datos
+        nueva_prediccion = PrediccionBombaB(
+            valor_prediccion=float(prediccion[0]),
+            hora_ejecucion=hora_actual,
+            dia_ejecucion=dia_actual
+        )
+        
+        db.add(nueva_prediccion)
+        db.commit()
+        
+        # Retornar la predicción
+        return {
+            "prediccion": float(prediccion[0]),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error al realizar la predicción para bomba B: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al realizar la predicción: {str(e)}"
+        )
 
 
 # Rutas

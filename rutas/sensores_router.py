@@ -564,33 +564,46 @@ async def predecir_bomba(
     - status: Estado de la operación
     """
     try:
-        # Ruta al modelo
-        model_path = os.path.join("modelos_prediccion", "bm_randomforest.pkl")
-        print(model_path)
-        # Cargar el modelo
+        # Obtener el modelo usando ModelRegistry en lugar de cargarlo directamente
+        logger.info("Obteniendo modelo para predicción de bomba")
+        model_path = os.path.join(MODELS_DIR, "bm_randomforest_bomba_a.pkl")
         model = joblib.load(model_path)
-        print(model)
         
         # Preparar los datos en el orden correcto para el modelo
         input_data = pd.DataFrame([{
-    'Presión Agua Alimentación AP (barg)': datos.presion_agua,
-    'Voltaje Barra 6,6KV (V)': datos.voltaje_barra,
-    'Corriente Motor Bomba Agua Alimentacion BFWP A (A)': datos.corriente_motor,
-    'Vibración Axial Descanso Emp Bomba 1A (ms)': datos.vibracion_axial,
-    'Salida de Bomba de Alta Presión': datos.salida_bomba,
-    'Flujo de Agua Atemperación Vapor Alta AP SH (kg/h)': datos.flujo_agua,
-    'MW Brutos de Generación Total Gas (MW)': datos.mw_brutos_gas,
-    'Temperatura Descanso Interno Motor Bomba 1A (°C)': datos.temp_motor,
-    'Temperatura Descanso Interno Bomba 1A (°C)': datos.temp_bomba,
-    'Temperatura Descanso Interno Empuje Bomba 1A (°C)': datos.temp_empuje,
-    'Temperatura Ambiental (°C)': datos.temp_ambiental
-}])
-        print(input_data)
+            # Campos originales
+            'Presión Agua Alimentación AP (barg)': datos.presion_agua,
+            'Voltaje Barra 6,6KV (V)': datos.voltaje_barra,
+            'Corriente Motor Bomba Agua Alimentacion BFWP A (A)': datos.corriente_motor,
+            'Vibración Axial Descanso Emp Bomba 1A (ms)': datos.vibracion_axial,
+            'Salida de Bomba de Alta Presión': datos.salida_bomba,
+            'Flujo de Agua Atemperación Vapor Alta AP SH (kg/h)': datos.flujo_agua,
+            'MW Brutos de Generación Total Gas (MW)': datos.mw_brutos_gas,
+            'Temperatura Descanso Interno Motor Bomba 1A (°C)': datos.temp_motor,
+            'Temperatura Descanso Interno Bomba 1A (°C)': datos.temp_bomba,
+            'Temperatura Descanso Interno Empuje Bomba 1A (°C)': datos.temp_empuje,
+            'Temperatura Ambiental (°C)': datos.temp_ambiental,
+            
+            # Campos adicionales para los otros modelos
+            'Excentricidad Bomba 1A': datos.excentricidad_bomba,
+            'Flujo de Agua Alimentación Domo AP': datos.flujo_agua_domo_ap,
+            'Flujo de Agua Alimentación Domo MP': datos.flujo_agua_domo_mp,
+            'Flujo de Agua Atemperación Recalentador': datos.flujo_agua_recalentador,
+            'Posición válvula recirculación BAA': datos.posicion_valvula_recirc,
+            'Presión Agua Alimentación Economizador MP': datos.presion_agua_mp,
+            'Presión succión BAA': datos.presion_succion_baa,
+            'Temperatura Estator Motor Bomba AA': datos.temperatura_estator,
+            'Flujo de Salida 12FPMFC': datos.flujo_salida_12fpmfc
+        }])
+        
+        logger.info(f"DataFrame de entrada preparado con shape: {input_data.shape}")
+        
         # Realizar la predicción
         prediccion = model.predict(input_data)
-        print(prediccion)
+        logger.info(f"Predicción realizada: {prediccion[0]}")
+        
         # Obtener la hora y fecha actual
-        ahora = datetime.now()
+        ahora = datetime.now(timezone.utc)
         hora_actual = ahora.strftime("%H:%M:%S")
         dia_actual = ahora.strftime("%Y-%m-%d")
         
