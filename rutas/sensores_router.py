@@ -73,7 +73,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "modelos_prediccion")  # Ruta absoluta
 MODEL_PATHS = {
     # Modelos originales actualizados
     "corriente_motor": "Corriente_MTR_BBA_Agua_Alim_1A.pkl",
-    "mw_brutos_gas": "bm_randomforest.pkl",
+    "mw_brutos_gas": "model_MW_brutos.pkl",
     "presion_agua": "Presi_n_Agua_Alimentacion_Econ._AP.pkl",
     "salida_bomba": "Temperatura_descarga_Bba_Agua_Alim_1A.pkl",
     "temperatura_ambiental": "Temp_Ambiental.pkl",
@@ -495,6 +495,10 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
 
     # Ajuste de contador local en la tabla
     # Asegúrate de que el modelo SQL tenga un campo 'contador_anomalias' (Integer, default=0)
+    # Inicializar contador_anomalias si es None
+    if lectura.contador_anomalias is None:
+        lectura.contador_anomalias = 0
+        
     if clase == -1:
         lectura.contador_anomalias = lectura.contador_anomalias + 1
         print(f"[{umbral_key}] Anomalía detectada. Contador actualizado: {lectura.contador_anomalias}")
