@@ -242,14 +242,21 @@ def contar_anomalias(db: Session, model_class, sensor_id: int) -> int:
     """
     Cuenta anomalías (clasificacion == -1) para un modelo de sensor específico
     en la ventana de tiempo.
+    
+    Nota: No filtramos por sensor_id específico porque queremos contar todas las
+    anomalías del mismo tipo de sensor (misma tabla) en la ventana de tiempo.
     """
-    ahora = datetime.now(timezone.utc)
-    inicio = ahora - timedelta(hours=VENTANA_HORAS)
-    return db.query(func.count(model_class.id)) \
-        .filter(model_class.clasificacion == -1) \
-        .filter(model_class.id == sensor_id) \
-        .filter(model_class.tiempo_ejecucion.between(inicio, ahora)) \
-        .scalar()
+    try:
+        ahora = datetime.now(timezone.utc)
+        inicio = ahora - timedelta(hours=VENTANA_HORAS)
+        count = db.query(func.count(model_class.id)) \
+            .filter(model_class.clasificacion == -1) \
+            .filter(model_class.tiempo_ejecucion.between(inicio, ahora)) \
+            .scalar()
+        return count if count is not None else 0
+    except Exception as e:
+        logger.error(f"Error al contar anomalías: {str(e)}")
+        return 0  # En caso de error, devolvemos 0 para evitar interrumpir el flujo
 
 
 # Información detallada de cada sensor para mensajes más descriptivos
@@ -485,36 +492,78 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
     """
     Lógica común de clasificación, conteo incremental/decremental y generación de alertas.
     """
-    clase = predecir_sensores_np(modelos[modelo_key], sensor.valor)
-    descripcion = "Normal" if clase == 1 else "Anomalía"
+    try:
+        # Predecir si es anomalía o no
+        clase = predecir_sensores_np(modelos[modelo_key], sensor.valor)
+        descripcion = "Normal" if clase == 1 else "Anomalía"
 
-    # Actualiza lectura
-    lectura = db.query(model_class).get(sensor.id_sensor)
-    if not lectura:
-        raise HTTPException(404, "Lectura no encontrada")
+        # Intentar recuperar la lectura con manejo de excepciones
+        try:
+            lectura = db.query(model_class).get(sensor.id_sensor)
+            if not lectura:
+                logger.warning(f"Lectura no encontrada para sensor_id: {sensor.id_sensor}. Creando nuevo registro.")
+                # Crear un nuevo registro si no existe
+                lectura = model_class(
+                    id=sensor.id_sensor,
+                    tiempo_ejecucion=datetime.now(timezone.utc),
+                    tiempo_sensor=sensor.tiempo_sensor,
+                    valor_sensor=sensor.valor,
+                    clasificacion=clase,
+                    contador_anomalias=0
+                )
+                db.add(lectura)
+            
+            # Guardar la clasificación anterior para detectar cambios
+            clasificacion_anterior = lectura.clasificacion
 
-    # Ajuste de contador local en la tabla
-    # Asegúrate de que el modelo SQL tenga un campo 'contador_anomalias' (Integer, default=0)
-    # Inicializar contador_anomalias si es None
-    if lectura.contador_anomalias is None:
-        lectura.contador_anomalias = 0
-        
+            # Actualizar la clasificación actual y tiempo de ejecución
+            lectura.clasificacion = clase
+            lectura.tiempo_ejecucion = datetime.now(timezone.utc)
+            
+            # Hacer el primer commit para guardar la clasificación y tiempo
+            try:
+                db.commit()
+            except Exception as commit_error:
+                logger.error(f"Error al hacer commit de la clasificación: {str(commit_error)}")
+                db.rollback()
+                
+        except Exception as db_error:
+            logger.error(f"Error al acceder a la base de datos: {str(db_error)}")
+            # Crear un objeto temporal en memoria sin persistirlo
+            lectura = model_class(
+                id=sensor.id_sensor,
+                tiempo_ejecucion=datetime.now(timezone.utc),
+                tiempo_sensor=sensor.tiempo_sensor,
+                valor_sensor=sensor.valor,
+                clasificacion=clase,
+                contador_anomalias=0
+            )
+            clasificacion_anterior = None
+            
+    except Exception as e:
+        logger.error(f"Error general en procesar(): {str(e)}")
+        raise HTTPException(500, f"Error al procesar datos del sensor: {str(e)}")
+    
+    # En lugar de incrementar/decrementar directamente, contamos las anomalías
+    # reales dentro de la ventana de tiempo establecida (VENTANA_HORAS)
+    anomalias_ventana = contar_anomalias(db, model_class, sensor.id_sensor)
+    
+    # Actualizamos el contador de anomalías con el valor real contado
+    lectura.contador_anomalias = anomalias_ventana
+    
+    # Registrar lo que ha ocurrido
     if clase == -1:
-        lectura.contador_anomalias = lectura.contador_anomalias + 1
-        print(f"[{umbral_key}] Anomalía detectada. Contador actualizado: {lectura.contador_anomalias}")
+        print(f"[{umbral_key}] Anomalía detectada. Anomalías en ventana de tiempo: {anomalias_ventana}")
     else:
-        lectura.contador_anomalias = max(lectura.contador_anomalias - 1, 0)
-        print(f"[{umbral_key}] Valor normal. Contador actualizado: {lectura.contador_anomalias}")
-
-
-    lectura.clasificacion = clase
-    lectura.tiempo_ejecucion = datetime.now(timezone.utc)
+        print(f"[{umbral_key}] Valor normal. Anomalías en ventana de tiempo: {anomalias_ventana}")
+    
+    # Hacer commit para guardar el contador actualizado
     db.commit()
-
-        # Si es anomalía, evaluamos niveles de alerta en base al contador almacenado
-    if clase == -1:
-        conteo = lectura.contador_anomalias
-        alerta_info = determinar_alerta(conteo, umbral_key)
+    
+    # Si es anomalía, evaluamos niveles de alerta basados en el conteo de anomalías
+    if clase == -1 and anomalias_ventana > 0:
+        # Usamos el número real de anomalías en la ventana de tiempo
+        alerta_info = determinar_alerta(anomalias_ventana, umbral_key)
         if alerta_info:
             # Buscar alerta previa para comparar nivel
             prev = db.query(Alerta) \
@@ -529,14 +578,15 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             # Solo generar nueva alerta si el nivel ha aumentado
             if curr_n > prev_n:
                 # Construir mensaje descriptivo
-                mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']} - {alerta_info['conteo_anomalias']} anomalías consecutivas ({alerta_info['porcentaje_umbral']}% del umbral crítico)\n"
+                mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']} - {alerta_info['conteo_anomalias']} anomalías en {VENTANA_HORAS} horas ({alerta_info['porcentaje_umbral']}% del umbral crítico)\n"
                 mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
                 
                 alerta = Alerta(
                     sensor_id=sensor.id_sensor,
                     tipo_sensor=umbral_key,
-                    descripcion=mensaje
+                    descripcion=mensaje,
+                    contador_anomalias=anomalias_ventana  # Guardar el contador basado en ventana de tiempo
                 )
                 db.add(alerta)
                 db.commit()
@@ -546,7 +596,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         "valor": sensor.valor,
         "prediccion": clase,
         "descripcion": descripcion,
-        "contador_anomalias": lectura.contador_anomalias
+        "contador_anomalias": anomalias_ventana
     }
 
 
