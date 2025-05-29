@@ -872,7 +872,7 @@ async def predecir_bomba_b(
     - datos: Objeto con los valores de entrada para el modelo
     
     Retorna:
-    - prediccion: Valor predicho por el modelo
+    - prediccion: Valor predicho por el modelo (probabilidad)
     - status: Estado de la operación
     """
     try:
@@ -905,9 +905,22 @@ async def predecir_bomba_b(
         
         logger.info(f"DataFrame de entrada preparado con shape: {input_data.shape}")
         
-        # Realizar la predicción
+        # Realizar la predicción y obtener probabilidades
         prediccion = model.predict(input_data)
-        logger.info(f"Predicción realizada: {prediccion[0]}")
+        # Obtener probabilidades para cada clase
+        probabilidades = model.predict_proba(input_data)
+        
+        # Seleccionar la probabilidad correspondiente a la clase predicha
+        # Si es clasificación binaria (0,1), tomamos el índice correspondiente a la clase predicha
+        clase_predicha = int(prediccion[0])
+        # Asumiendo que predict_proba devuelve probabilidades para todas las clases en orden
+        # Para clasificación binaria, [0] es prob de clase 0, [1] es prob de clase 1
+        prob_clase_predicha = float(probabilidades[0][clase_predicha])
+        
+        # Convertir la probabilidad a porcentaje con dos decimales
+        porcentaje_prediccion = round(prob_clase_predicha * 100, 2)
+        
+        logger.info(f"Predicción realizada: {prediccion[0]} con probabilidad: {porcentaje_prediccion:.2f}%")
         
         # Obtener la hora y fecha actual
         ahora = datetime.now(timezone.utc)
@@ -915,8 +928,9 @@ async def predecir_bomba_b(
         dia_actual = ahora.strftime("%Y-%m-%d")
         
         # Guardar la predicción en la base de datos
+        # Usamos el porcentaje de probabilidad como valor de predicción
         nueva_prediccion = PrediccionBombaB(
-            valor_prediccion=float(prediccion[0]),
+            valor_prediccion=porcentaje_prediccion,  # Guardamos el porcentaje de probabilidad
             hora_ejecucion=hora_actual,
             dia_ejecucion=dia_actual
         )
@@ -924,9 +938,9 @@ async def predecir_bomba_b(
         db.add(nueva_prediccion)
         db.commit()
         
-        # Retornar la predicción
+        # Retornar la predicción con el porcentaje de probabilidad
         return {
-            "prediccion": float(prediccion[0]),
+            "prediccion": porcentaje_prediccion,  # Devolvemos el porcentaje de probabilidad como predicción
             "status": "success"
         }
         
