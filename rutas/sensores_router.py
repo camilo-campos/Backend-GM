@@ -515,6 +515,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             
             # Guardar la clasificación anterior para detectar cambios
             clasificacion_anterior = lectura.clasificacion
+            # Guardar el contador anterior para poder decrementarlo si es necesario
+            contador_anterior = lectura.contador_anomalias if hasattr(lectura, 'contador_anomalias') else 0
 
             # Actualizar la clasificación actual y tiempo de ejecución
             lectura.clasificacion = clase
@@ -539,31 +541,33 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 contador_anomalias=0
             )
             clasificacion_anterior = None
+            contador_anterior = 0
             
     except Exception as e:
         logger.error(f"Error general en procesar(): {str(e)}")
         raise HTTPException(500, f"Error al procesar datos del sensor: {str(e)}")
     
-    # En lugar de incrementar/decrementar directamente, contamos las anomalías
-    # reales dentro de la ventana de tiempo establecida (VENTANA_HORAS)
+    # Obtenemos el conteo de anomalías en la ventana de tiempo
     anomalias_ventana = contar_anomalias(db, model_class, sensor.id_sensor)
     
-    # Actualizamos el contador de anomalías con el valor real contado
-    lectura.contador_anomalias = anomalias_ventana
-    
-    # Registrar lo que ha ocurrido
-    if clase == -1:
+    # Ajustar contador según la clasificación
+    if clase == 1:  # Si es normal
+        # Decrementamos el contador previo en 1, pero nunca por debajo de 0
+        nuevo_contador = max(0, contador_anterior - 1)
+        lectura.contador_anomalias = nuevo_contador
+        print(f"[{umbral_key}] Valor normal. Contador decrementado de {contador_anterior} a {nuevo_contador}")
+    else:  # Si es anomalía
+        # Para anomalías usamos el conteo real de la ventana de tiempo
+        lectura.contador_anomalias = anomalias_ventana
         print(f"[{umbral_key}] Anomalía detectada. Anomalías en ventana de tiempo: {anomalias_ventana}")
-    else:
-        print(f"[{umbral_key}] Valor normal. Anomalías en ventana de tiempo: {anomalias_ventana}")
     
     # Hacer commit para guardar el contador actualizado
     db.commit()
     
     # Si es anomalía, evaluamos niveles de alerta basados en el conteo de anomalías
-    if clase == -1 and anomalias_ventana > 0:
-        # Usamos el número real de anomalías en la ventana de tiempo
-        alerta_info = determinar_alerta(anomalias_ventana, umbral_key)
+    if clase == -1 and lectura.contador_anomalias > 0:
+        # Usamos el contador actual para determinar la alerta
+        alerta_info = determinar_alerta(lectura.contador_anomalias, umbral_key)
         if alerta_info:
             # Buscar alerta previa para comparar nivel
             prev = db.query(Alerta) \
@@ -586,7 +590,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                     sensor_id=sensor.id_sensor,
                     tipo_sensor=umbral_key,
                     descripcion=mensaje,
-                    contador_anomalias=anomalias_ventana  # Guardar el contador basado en ventana de tiempo
+                    contador_anomalias=lectura.contador_anomalias  # Guardar el contador actualizado
                 )
                 db.add(alerta)
                 db.commit()
