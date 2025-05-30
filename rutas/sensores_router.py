@@ -661,17 +661,15 @@ async def predecir_bomba(
         # Obtener probabilidades para cada clase
         probabilidades = model.predict_proba(input_data)
         
-        # Seleccionar la probabilidad correspondiente a la clase predicha
-        # Si es clasificación binaria (0,1), tomamos el índice correspondiente a la clase predicha
-        clase_predicha = int(prediccion[0])
-        # Asumiendo que predict_proba devuelve probabilidades para todas las clases en orden
-        # Para clasificación binaria, [0] es prob de clase 0, [1] es prob de clase 1
-        prob_clase_predicha = float(probabilidades[0][clase_predicha])
+        # Obtenemos siempre la probabilidad de falla (clase 1)
+        # En modelos binarios predict_proba devuelve probabilidades para [clase 0, clase 1]
+        prob_no_falla = float(probabilidades[0][0])  # Probabilidad de no falla (clase 0)
+        prob_falla = 1 - prob_no_falla  # Probabilidad de falla (clase 1)
         
         # Convertir la probabilidad a porcentaje con dos decimales
-        porcentaje_prediccion = round(prob_clase_predicha * 100, 2)
+        porcentaje_prediccion = round(prob_falla * 100, 2)
         
-        logger.info(f"Predicción realizada: {prediccion[0]} con probabilidad: {porcentaje_prediccion:.2f}%")
+        logger.info(f"Predicción realizada: {prediccion[0]} con probabilidad de falla: {porcentaje_prediccion:.2f}%")
         
         # Obtener la hora y fecha actual
         ahora = datetime.now(timezone.utc)
