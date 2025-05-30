@@ -639,7 +639,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 # Crear un nuevo registro si no existe
                 lectura = model_class(
                     id=sensor.id_sensor,
-                    tiempo_ejecucion=datetime.now(timezone.utc),
+                    tiempo_ejecucion=sensor.tiempo_sensor,
                     tiempo_sensor=sensor.tiempo_sensor,
                     valor_sensor=sensor.valor,
                     clasificacion=clase,
@@ -655,7 +655,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             # Crear un objeto temporal en memoria sin persistirlo
             lectura = model_class(
                 id=sensor.id_sensor,
-                tiempo_ejecucion=datetime.now(timezone.utc),
+                tiempo_ejecucion=sensor.tiempo_sensor,
                 tiempo_sensor=sensor.tiempo_sensor,
                 valor_sensor=sensor.valor,
                 clasificacion=clase,
@@ -663,9 +663,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             )
             contador_anterior = 0
 
-        # Actualizar la clasificación y tiempo de ejecución
+        # Actualizar solo la clasificación
         lectura.clasificacion = clase
-        lectura.tiempo_ejecucion = datetime.now(timezone.utc)
     except Exception as e:
         logger.error(f"Error general en procesar(): {str(e)}")
         raise HTTPException(500, f"Error al procesar datos del sensor: {str(e)}")

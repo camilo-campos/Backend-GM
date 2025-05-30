@@ -505,7 +505,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 # Crear un nuevo registro si no existe
                 lectura = model_class(
                     id=sensor.id_sensor,
-                    tiempo_ejecucion=datetime.now(timezone.utc),
+                    tiempo_ejecucion=sensor.tiempo_sensor,
                     tiempo_sensor=sensor.tiempo_sensor,
                     valor_sensor=sensor.valor,
                     clasificacion=clase,
@@ -518,9 +518,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             # Guardar el contador anterior para poder decrementarlo si es necesario
             contador_anterior = lectura.contador_anomalias if hasattr(lectura, 'contador_anomalias') else 0
 
-            # Actualizar la clasificación actual y tiempo de ejecución
+            # Actualizar solo la clasificación actual
             lectura.clasificacion = clase
-            lectura.tiempo_ejecucion = datetime.now(timezone.utc)
             
             # Hacer el primer commit para guardar la clasificación y tiempo
             try:
@@ -534,7 +533,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             # Crear un objeto temporal en memoria sin persistirlo
             lectura = model_class(
                 id=sensor.id_sensor,
-                tiempo_ejecucion=datetime.now(timezone.utc),
+                tiempo_ejecucion=sensor.tiempo_sensor,
                 tiempo_sensor=sensor.tiempo_sensor,
                 valor_sensor=sensor.valor,
                 clasificacion=clase,
