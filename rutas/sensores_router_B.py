@@ -365,25 +365,22 @@ def predecir_sensores_np(modelo, valor):
     return int(modelo.predict(X)[0])
 
 
-def contar_anomalias(db: Session, model_class, sensor_id: int) -> int:
+def contar_anomalias(db: Session, model_class, sensor_id: int, tiempo_base: datetime) -> int:
     """
     Cuenta anomalías (clasificacion == -1) para un modelo de sensor específico
-    en la ventana de tiempo.
-    
-    Nota: No filtramos por sensor_id específico porque queremos contar todas las
-    anomalías del mismo tipo de sensor (misma tabla) en la ventana de tiempo.
+    en la ventana de tiempo RELATIVA al dato actual (tiempo_base).
     """
     try:
-        ahora = datetime.now(timezone.utc)
-        inicio = ahora - timedelta(hours=VENTANA_HORAS)
+        inicio = tiempo_base - timedelta(hours=VENTANA_HORAS)
         count = db.query(func.count(model_class.id)) \
             .filter(model_class.clasificacion == -1) \
-            .filter(model_class.tiempo_ejecucion.between(inicio, ahora)) \
+            .filter(model_class.tiempo_ejecucion.between(inicio, tiempo_base)) \
             .scalar()
         return count if count is not None else 0
     except Exception as e:
         logger.error(f"Error al contar anomalías: {str(e)}")
-        return 0  # En caso de error, devolvemos 0 para evitar interrumpir el flujo
+        return 0
+
 
 
 # Información detallada de cada sensor para mensajes más descriptivos
@@ -671,7 +668,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         
     
     # Obtenemos el conteo de anomalías en la ventana de tiempo
-    anomalias_ventana = contar_anomalias(db, model_class, sensor.id_sensor)
+    anomalias_ventana = contar_anomalias(db, model_class, sensor.id_sensor, lectura.tiempo_ejecucion)
+
     
     # Ajustar contador según la clasificación
     if clase == 1:  # Si es normal
