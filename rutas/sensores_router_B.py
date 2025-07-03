@@ -716,6 +716,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                     sensor_id=sensor.id_sensor,
                     tipo_sensor=umbral_key,
                     descripcion=mensaje,
+                    timestamp=sensor.tiempo_sensor,
                     contador_anomalias=conteo  # Guardar el contador actual en la alerta
                 )
                 db.add(alerta)
