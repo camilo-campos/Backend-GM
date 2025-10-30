@@ -10,3 +10,5 @@ langchain
 langchain-ibm 
 langchain_core
 python-dotenv
+langdetect
+openai

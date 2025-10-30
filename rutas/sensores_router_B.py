@@ -254,14 +254,14 @@ VENTANA_HORAS = 8  # horas
 UMBRAL_SENSORES = {
     # Sensores existentes con nombres corregidos
     'prediccion_corriente': {
-        "umbral_minimo": 54,  # 50% de 108
-        "umbral_alerta": 86,   # 80% de 108
-        "umbral_critica": 108,
+        "umbral_minimo": 1,  # Cambiado para testing
+        "umbral_alerta": 2,   # Cambiado para testing
+        "umbral_critica": 3,  # Cambiado para testing
     },
     'prediccion_presion_agua': {  # Corregido de prediccion_presion-agua
-        "umbral_minimo": 25,  # 50% de 51
-        "umbral_alerta": 41,  # 80% de 51
-        "umbral_critica": 51,
+        "umbral_minimo": 1,  # Cambiado para testing
+        "umbral_alerta": 2,  # Cambiado para testing
+        "umbral_critica": 3,  # Cambiado para testing
     },
     'prediccion_temperatura_ambiental': {  # Corregido de prediccion_temperatura-ambiental
         "umbral_minimo": 1,   # 50% de 2
@@ -365,22 +365,154 @@ def predecir_sensores_np(modelo, valor):
     return int(modelo.predict(X)[0])
 
 
-def contar_anomalias(db: Session, model_class, sensor_id: int, tiempo_base: datetime) -> int:
+def contar_anomalias(db: Session, model_class, tiempo_base: datetime) -> dict:
     """
     Cuenta anomalías (clasificacion == -1) para un modelo de sensor específico
     en la ventana de tiempo RELATIVA al dato actual (tiempo_base).
+    Devuelve información temporal detallada.
     """
     try:
         inicio = tiempo_base - timedelta(hours=VENTANA_HORAS)
-        count = db.query(func.count(model_class.id)) \
-            .filter(model_class.clasificacion == -1) \
-            .filter(model_class.tiempo_ejecucion.between(inicio, tiempo_base)) \
-            .scalar()
-        return count if count is not None else 0
+        
+        # Obtener todas las anomalías en la ventana de tiempo
+        anomalias_query = db.query(model_class).filter(
+            model_class.clasificacion == -1,
+            model_class.tiempo_ejecucion.between(inicio, tiempo_base)
+        ).order_by(model_class.tiempo_ejecucion).all()
+        
+        # Convertir a lista de diccionarios para facilitar el procesamiento
+        anomalias = []
+        for anomalia in anomalias_query:
+            anomalias.append({
+                'tiempo_ejecucion': anomalia.tiempo_ejecucion,
+                'valor_sensor': anomalia.valor_sensor
+            })
+        
+        conteo = len(anomalias)
+        
+        if conteo == 0:
+            return {
+                'conteo': 0,
+                'primera_anomalia': None,
+                'ultima_anomalia': None,
+                'duracion_total': 0,
+                'anomalias_consecutivas': 0,
+                'frecuencia_por_hora': 0.0,
+                'distribucion_temporal': {},
+                'patron_consecutivo': False
+            }
+        
+        # Calcular información temporal - filtrar timestamps None
+        timestamps_validos = [a['tiempo_ejecucion'] for a in anomalias if a['tiempo_ejecucion'] is not None]
+        
+        if not timestamps_validos:
+            # Si no hay timestamps válidos, retornar valores por defecto
+            return {
+                'conteo': conteo,
+                'primera_anomalia': None,
+                'ultima_anomalia': None,
+                'duracion_total': 0,
+                'anomalias_consecutivas': 0,
+                'frecuencia_por_hora': 0.0,
+                'distribucion_temporal': {},
+                'patron_consecutivo': False
+            }
+        
+        primera_anomalia = min(timestamps_validos)
+        ultima_anomalia = max(timestamps_validos)
+        duracion_total = (ultima_anomalia - primera_anomalia).total_seconds()
+        
+        # Calcular anomalías consecutivas
+        anomalias_consecutivas = calcular_anomalias_consecutivas(anomalias)
+        
+        # Calcular frecuencia por hora
+        frecuencia_por_hora = conteo / VENTANA_HORAS
+        
+        # Crear distribución temporal
+        distribucion_temporal = crear_distribucion_temporal(anomalias)
+        
+        # Determinar si hay un patrón consecutivo (más de 3 anomalías consecutivas)
+        patron_consecutivo = anomalias_consecutivas > 3
+        
+        return {
+            'conteo': conteo,
+            'primera_anomalia': primera_anomalia,
+            'ultima_anomalia': ultima_anomalia,
+            'duracion_total': duracion_total,
+            'anomalias_consecutivas': anomalias_consecutivas,
+            'frecuencia_por_hora': round(frecuencia_por_hora, 2),
+            'distribucion_temporal': distribucion_temporal,
+            'patron_consecutivo': patron_consecutivo
+        }
+        
     except Exception as e:
         logger.error(f"Error al contar anomalías: {str(e)}")
-        return 0
+        return {
+            'conteo': 0,
+            'primera_anomalia': None,
+            'ultima_anomalia': None,
+            'duracion_total': 0,
+            'anomalias_consecutivas': 0,
+            'frecuencia_por_hora': 0.0,
+            'distribucion_temporal': {},
+            'patron_consecutivo': False
+        }
 
+
+# Funciones auxiliares para análisis temporal
+def calcular_anomalias_consecutivas(anomalias):
+    """Calcula el número máximo de anomalías consecutivas"""
+    if not anomalias:
+        return 0
+    
+    max_consecutivas = 0
+    consecutivas_actuales = 0
+    
+    for i in range(len(anomalias) - 1):
+        tiempo_actual = anomalias[i]['tiempo_ejecucion']
+        tiempo_siguiente = anomalias[i + 1]['tiempo_ejecucion']
+        
+        # Convertir a datetime si son strings
+        if isinstance(tiempo_actual, str):
+            tiempo_actual = datetime.fromisoformat(tiempo_actual.replace('Z', '+00:00'))
+        if isinstance(tiempo_siguiente, str):
+            tiempo_siguiente = datetime.fromisoformat(tiempo_siguiente.replace('Z', '+00:00'))
+        
+        # Si la diferencia es menor a 10 minutos, consideramos consecutivas
+        diferencia = abs((tiempo_siguiente - tiempo_actual).total_seconds())
+        if diferencia <= 600:  # 10 minutos
+            consecutivas_actuales += 1
+        else:
+            max_consecutivas = max(max_consecutivas, consecutivas_actuales)
+            consecutivas_actuales = 0
+    
+    return max(max_consecutivas, consecutivas_actuales)
+
+def crear_distribucion_temporal(anomalias):
+    """Crea una distribución temporal de las anomalías por hora"""
+    distribucion = {}
+    
+    for anomalia in anomalias:
+        tiempo = anomalia['tiempo_ejecucion']
+        if isinstance(tiempo, str):
+            tiempo = datetime.fromisoformat(tiempo.replace('Z', '+00:00'))
+        
+        hora = tiempo.hour
+        distribucion[hora] = distribucion.get(hora, 0) + 1
+    
+    return distribucion
+
+def formatear_duracion(duracion_segundos):
+    """Formatea la duración en un formato legible"""
+    if duracion_segundos < 60:
+        return f"{int(duracion_segundos)} segundos"
+    elif duracion_segundos < 3600:
+        minutos = int(duracion_segundos / 60)
+        return f"{minutos} minutos"
+    else:
+        horas = int(duracion_segundos / 3600)
+        minutos = int((duracion_segundos % 3600) / 60)
+        return f"{horas}h {minutos}m"
 
 
 # Información detallada de cada sensor para mensajes más descriptivos
@@ -576,10 +708,59 @@ SENSOR_INFO = {
     }
 }
 
-def determinar_alerta(conteo: int, umbral_sensor_key: str) -> dict:
+def _crear_mensaje_temporal(info_anomalias: dict, nivel: str) -> str:
     """
-    Devuelve un diccionario con información completa de la alerta.
+    Crea un mensaje descriptivo basado en la información temporal de las anomalías.
     """
+    if info_anomalias['conteo'] == 0:
+        return ""
+    
+    mensaje_partes = []
+    
+    # Información básica
+    if info_anomalias['conteo'] == 1:
+        mensaje_partes.append("Se detectó 1 anomalía")
+    else:
+        mensaje_partes.append(f"Se detectaron {info_anomalias['conteo']} anomalías")
+    
+    # Información temporal
+    if info_anomalias['primera_anomalia'] and info_anomalias['ultima_anomalia']:
+        primera = info_anomalias['primera_anomalia'].strftime("%H:%M")
+        ultima = info_anomalias['ultima_anomalia'].strftime("%H:%M")
+        
+        if info_anomalias['conteo'] == 1:
+            mensaje_partes.append(f"a las {primera}")
+        else:
+            mensaje_partes.append(f"entre {primera} y {ultima}")
+    
+    # Información de consecutividad
+    if info_anomalias['anomalias_consecutivas'] > 1:
+        mensaje_partes.append(f"con {info_anomalias['anomalias_consecutivas']} anomalías consecutivas")
+    
+    # Frecuencia
+    if info_anomalias['frecuencia_por_hora'] > 0:
+        mensaje_partes.append(f"(frecuencia: {info_anomalias['frecuencia_por_hora']}/hora)")
+    
+    # Patrón crítico
+    if nivel == "CRÍTICA" and info_anomalias['patron_consecutivo']:
+        mensaje_partes.append("- PATRÓN CRÍTICO DETECTADO")
+    
+    return ". ".join(mensaje_partes) + "."
+
+
+def determinar_alerta(info_anomalias: dict, umbral_sensor_key: str, bomba_id: str = "B") -> dict:
+    """
+    Determina el nivel de alerta basado en la información de anomalías y los umbrales configurados.
+    
+    Args:
+        info_anomalias: Diccionario con información detallada de anomalías
+        umbral_sensor_key: Clave del sensor en UMBRAL_SENSORES
+        bomba_id: Identificador de la bomba (A o B)
+        
+    Returns:
+        dict: Información completa de la alerta o None si no hay alerta
+    """
+    conteo = info_anomalias.get('conteo', 0)
     u = UMBRAL_SENSORES.get(umbral_sensor_key, {})
     sensor_info = SENSOR_INFO.get(umbral_sensor_key, {
         'nombre': umbral_sensor_key,
@@ -601,13 +782,30 @@ def determinar_alerta(conteo: int, umbral_sensor_key: str) -> dict:
         porcentaje = 50
     
     if nivel:
+        # Agregar identificación de bomba al nombre del sensor
+        nombre_sensor_con_bomba = f"{sensor_info['nombre']} - BOMBA {bomba_id}"
+        
+        # Crear mensaje temporal descriptivo
+        mensaje_temporal = _crear_mensaje_temporal(info_anomalias, nivel)
+        descripcion_enriquecida = f"{sensor_info['descripcion']}. {mensaje_temporal}".strip()
+        
         return {
             "nivel": nivel,
-            "nombre_sensor": sensor_info['nombre'],
-            "descripcion_sensor": sensor_info['descripcion'],
+            "nombre_sensor": nombre_sensor_con_bomba,
+            "descripcion_sensor": descripcion_enriquecida,
             "accion_recomendada": sensor_info['acciones'].get(nivel, ""),
             "porcentaje_umbral": porcentaje,
-            "conteo_anomalias": conteo
+            "conteo_anomalias": conteo,
+            "bomba_id": bomba_id,
+            # Información temporal detallada
+            "timestamp_alerta": datetime.now(),
+            "primera_anomalia": info_anomalias.get('primera_anomalia'),
+            "ultima_anomalia": info_anomalias.get('ultima_anomalia'),
+            "duracion_total": formatear_duracion(info_anomalias.get('duracion_total', 0)),
+            "anomalias_consecutivas": info_anomalias.get('anomalias_consecutivas', 0),
+            "frecuencia_por_hora": info_anomalias.get('frecuencia_por_hora', 0.0),
+            "distribucion_temporal": info_anomalias.get('distribucion_temporal', {}),
+            "patron_consecutivo": info_anomalias.get('patron_consecutivo', False)
         }
     
     return None
@@ -629,46 +827,43 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         descripcion = "Normal" if clase == 1 else "Anomalía"
 
         # Intentar recuperar la lectura con manejo de excepciones
+        # Obtener último registro para conocer el contador previo
         try:
-            lectura = db.query(model_class).get(sensor.id_sensor)
-            if not lectura:
-                logger.warning(f"Lectura no encontrada para sensor_id: {sensor.id_sensor}. Creando nuevo registro.")
-                # Crear un nuevo registro si no existe
-                lectura = model_class(
-                    id=sensor.id_sensor,
-                    tiempo_ejecucion=sensor.tiempo_sensor,
-                    tiempo_sensor=sensor.tiempo_sensor,
-                    valor_sensor=sensor.valor,
-                    clasificacion=clase,
-                    contador_anomalias=0
-                )
-                db.add(lectura)
-                contador_anterior = 0
-            else:
-                # Guardar el contador anterior para poder decrementarlo si es necesario
-                contador_anterior = lectura.contador_anomalias if hasattr(lectura, 'contador_anomalias') else 0
+            ultima = db.query(model_class).order_by(model_class.id.desc()).first()
+            contador_anterior = ultima.contador_anomalias if ultima and hasattr(ultima, 'contador_anomalias') else 0
         except Exception as db_error:
             logger.error(f"Error al acceder a la base de datos: {str(db_error)}")
-            # Crear un objeto temporal en memoria sin persistirlo
+            contador_anterior = 0
+
+        # Buscar registro existente o crear uno nuevo
+        lectura = db.query(model_class).filter(
+            model_class.tiempo_sensor == sensor.tiempo_sensor
+        ).first()
+        
+        if lectura:
+            # Actualizar registro existente
+            lectura.clasificacion = clase
+            lectura.valor_sensor = sensor.valor
+            lectura.tiempo_ejecucion = sensor.tiempo_sensor
+            lectura.tiempo_sensor = sensor.tiempo_sensor
+        else:
+            # Crear nuevo registro solo si no existe
             lectura = model_class(
-                id=sensor.id_sensor,
                 tiempo_ejecucion=sensor.tiempo_sensor,
                 tiempo_sensor=sensor.tiempo_sensor,
                 valor_sensor=sensor.valor,
                 clasificacion=clase,
                 contador_anomalias=0
             )
-            contador_anterior = 0
-
-        # Actualizar solo la clasificación
-        lectura.clasificacion = clase
+            db.add(lectura)
     except Exception as e:
         logger.error(f"Error general en procesar(): {str(e)}")
         raise HTTPException(500, f"Error al procesar datos del sensor: {str(e)}")
         
     
-    # Obtenemos el conteo de anomalías en la ventana de tiempo
-    anomalias_ventana = contar_anomalias(db, model_class, sensor.id_sensor, lectura.tiempo_ejecucion)
+    # Obtenemos la información detallada de anomalías en la ventana de tiempo
+    info_anomalias = contar_anomalias(db, model_class, lectura.tiempo_ejecucion)
+    conteo_anomalias = info_anomalias['conteo']
 
     
     # Ajustar contador según la clasificación
@@ -679,8 +874,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         print(f"[{umbral_key}] Valor normal. Contador decrementado de {contador_anterior} a {nuevo_contador}")
     else:  # Si es anomalía
         # Para anomalías usamos el conteo real de la ventana de tiempo
-        lectura.contador_anomalias = anomalias_ventana
-        print(f"[{umbral_key}] Anomalía detectada. Anomalías en ventana de tiempo: {anomalias_ventana}")
+        lectura.contador_anomalias = conteo_anomalias
+        print(f"[{umbral_key}] Anomalía detectada. Anomalías en ventana de tiempo: {conteo_anomalias}")
     
     # Hacer commit para guardar cambios
     db.commit()
@@ -691,13 +886,12 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
 
     # Si es anomalía, evaluamos niveles de alerta en base al contador actualizado
     if clase == -1:
-        # Utilizamos el contador actualizado que está en la variable lectura
-        conteo = lectura.contador_anomalias
-        alerta_info = determinar_alerta(conteo, umbral_key)
+        # Utilizamos la información detallada de anomalías
+        alerta_info = determinar_alerta(info_anomalias, umbral_key, "B")
         if alerta_info:
             # Buscar alerta previa para comparar nivel
             prev = db.query(Alerta) \
-                     .filter(Alerta.sensor_id == sensor.id_sensor, Alerta.tipo_sensor == umbral_key) \
+                     .filter(Alerta.tipo_sensor == umbral_key) \
                      .order_by(Alerta.id.desc()) \
                      .first()
             
@@ -713,21 +907,21 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
                 
                 alerta = Alerta(
-                    sensor_id=sensor.id_sensor,
+                    sensor_id=lectura.id,
                     tipo_sensor=umbral_key,
                     descripcion=mensaje,
                     timestamp=sensor.tiempo_sensor,
-                    contador_anomalias=conteo  # Guardar el contador actual en la alerta
+                    contador_anomalias=conteo_anomalias  # Guardar el contador actual en la alerta
                 )
                 db.add(alerta)
                 db.commit()
 
     return {
-        "id_sensor": sensor.id_sensor,
+        "id_registro": lectura.id,
         "valor": sensor.valor,
         "prediccion": clase,
         "descripcion": descripcion,
-        "contador_anomalias": lectura.contador_anomalias
+        "contador_anomalias": conteo_anomalias
     }
 
 

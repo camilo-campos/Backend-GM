@@ -4,6 +4,8 @@ from modelos.database import get_db
 from modelos.modelos import BitacoraB
 from esquemas.esquema import BitacoraInput
 from langchain_llm.analisis import llm_chain, llm_chain_2
+from utils.traduccion_bitacoras import verificar_y_traducir_bitacora
+import asyncio
 
 router = APIRouter(prefix="/bitacoras_b", tags=["bitacoras_b"])
 
@@ -36,9 +38,21 @@ async def _get_and_classify_bitacoras(db: Session):
                 b.clasificacion = primer_analisis
 
             db.add(b)
+        
         db.commit()
+        
+        # Verificar y traducir bitácoras después de la clasificación (asíncrono)
         for b in no_clasificadas:
             db.refresh(b)
+            # Aplicar verificación y traducción automática
+            try:
+                resultado_traduccion = await verificar_y_traducir_bitacora(b.id, db)
+                if resultado_traduccion['traduccion_realizada']:
+                    print(f"✅ BitácoraB {b.id} traducida automáticamente")
+                elif resultado_traduccion['errores']:
+                    print(f"❌ Errores en traducción de BitácoraB {b.id}: {resultado_traduccion['errores']}")
+            except Exception as e:
+                print(f"❌ Error en traducción de BitácoraB {b.id}: {e}")
 
     return bitacoras
 
@@ -56,10 +70,32 @@ async def predecir_corriente(bitacora: BitacoraInput, db: Session = Depends(get_
             bitacora_db.clasificacion = primer_analisis
             bitacora_db.alerta_aviso = segundo_analisis
             db.commit()
+            
+            # Verificar y traducir después de la clasificación (asíncrono)
+            try:
+                resultado_traduccion = await verificar_y_traducir_bitacora(bitacora_db.id, db)
+                if resultado_traduccion['traduccion_realizada']:
+                    print(f"✅ BitácoraB {bitacora_db.id} traducida exitosamente")
+                else:
+                    print(f"ℹ️ BitácoraB {bitacora_db.id} no requirió traducción")
+            except Exception as e:
+                print(f"❌ Error en traducción de BitácoraB {bitacora_db.id}: {e}")
+            
             return {"primer resultado": primer_analisis, "segundo resultado": segundo_analisis}
         else:
             bitacora_db.clasificacion = primer_analisis
             db.commit()
+            
+            # Verificar y traducir después de la clasificación (asíncrono)
+            try:
+                resultado_traduccion = await verificar_y_traducir_bitacora(bitacora_db.id, db)
+                if resultado_traduccion['traduccion_realizada']:
+                    print(f"✅ BitácoraB {bitacora_db.id} traducida exitosamente")
+                else:
+                    print(f"ℹ️ BitácoraB {bitacora_db.id} no requirió traducción")
+            except Exception as e:
+                print(f"❌ Error en traducción de BitácoraB {bitacora_db.id}: {e}")
+            
             return {"primer resultado": primer_analisis}
 
     except Exception as e:

@@ -7,7 +7,6 @@ class DatosSensores(BaseModel):
     
 
 class SensorInput(BaseModel):
-    id_sensor: str
     valor: float
     
     
