@@ -148,6 +148,12 @@ from functools import lru_cache
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# ==========================================
+# CACHE PARA CONTAR_ANOMALIAS
+# ==========================================
+CACHE_ANOMALIAS = {}
+CACHE_TIMEOUT = 30  # segundos - ajustar según necesidad
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Obtiene la ruta del archivo actual
 MODELS_DIR = os.path.join(BASE_DIR, "..", "modelos_prediccion_b")  # Ruta absoluta a la carpeta de modelos
 
@@ -363,6 +369,44 @@ def predecir_sensores_np(modelo, valor):
     """
     X = np.array([[valor]])
     return int(modelo.predict(X)[0])
+
+
+def contar_anomalias_cached(db: Session, model_class, tiempo_base: datetime) -> dict:
+    """
+    Versión con cache de contar_anomalias().
+    Reduce queries a BD cuando múltiples sensores llegan en poco tiempo.
+    """
+    # Clave de cache: nombre de tabla + hora redondeada al minuto
+    cache_key = (
+        model_class.__tablename__,
+        tiempo_base.replace(second=0, microsecond=0)
+    )
+
+    # Verificar si está en cache y es reciente
+    if cache_key in CACHE_ANOMALIAS:
+        cached_data, timestamp = CACHE_ANOMALIAS[cache_key]
+        elapsed = (datetime.now() - timestamp).total_seconds()
+
+        if elapsed < CACHE_TIMEOUT:
+            logger.info(f"✅ Cache HIT para {model_class.__tablename__} (edad: {elapsed:.1f}s)")
+            return cached_data
+
+    # Cache miss - calcular
+    logger.info(f"❌ Cache MISS para {model_class.__tablename__}, consultando BD...")
+    resultado = contar_anomalias(db, model_class, tiempo_base)
+
+    # Guardar en cache
+    CACHE_ANOMALIAS[cache_key] = (resultado, datetime.now())
+
+    # Limpieza de cache antiguo (mantener solo últimos 100)
+    if len(CACHE_ANOMALIAS) > 100:
+        # Ordenar por timestamp y eliminar los 50 más antiguos
+        items_ordenados = sorted(CACHE_ANOMALIAS.items(), key=lambda x: x[1][1])
+        for key, _ in items_ordenados[:50]:
+            del CACHE_ANOMALIAS[key]
+        logger.info(f"🧹 Cache limpiado: {len(CACHE_ANOMALIAS)} entradas restantes")
+
+    return resultado
 
 
 def contar_anomalias(db: Session, model_class, tiempo_base: datetime) -> dict:
@@ -839,21 +883,34 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
 
         # NUEVA LÓGICA: Si viene id_sensor, actualizar ese registro específico
         if sensor.id_sensor:
-            # Buscar por ID específico
-            lectura = db.query(model_class).filter(
+            # OPTIMIZACIÓN: UPDATE directo sin SELECT previo
+            # Primero obtenemos el contador anterior para el cálculo posterior
+            lectura_anterior = db.query(model_class.clasificacion, model_class.contador_anomalias).filter(
                 model_class.id == sensor.id_sensor
             ).first()
 
-            if not lectura:
+            if not lectura_anterior:
                 logger.error(f"Registro con id {sensor.id_sensor} no encontrado")
                 raise HTTPException(404, f"Registro con id {sensor.id_sensor} no encontrado")
 
-            # Guardar valor anterior del contador
-            contador_anterior = lectura.contador_anomalias if hasattr(lectura, 'contador_anomalias') else 0
+            contador_anterior = lectura_anterior.contador_anomalias if lectura_anterior.contador_anomalias else 0
 
-            # Actualizar el registro con la nueva clasificación
-            lectura.clasificacion = clase
-            logger.info(f"Registro ID {sensor.id_sensor} actualizado: clasificacion={clase}, valor={sensor.valor}")
+            # UPDATE directo (no traemos todo el registro)
+            rows_updated = db.query(model_class).filter(
+                model_class.id == sensor.id_sensor
+            ).update({
+                'clasificacion': clase
+            }, synchronize_session=False)
+
+            if rows_updated == 0:
+                raise HTTPException(404, f"No se pudo actualizar registro {sensor.id_sensor}")
+
+            logger.info(f"✅ UPDATE directo ID {sensor.id_sensor}: clasificacion={clase}")
+
+            # Necesitamos el objeto para usar después
+            lectura = db.query(model_class).filter(
+                model_class.id == sensor.id_sensor
+            ).first()
 
         else:
             # Comportamiento original: buscar por tiempo_sensor o crear nuevo
@@ -882,9 +939,9 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         logger.error(f"Error general en procesar(): {str(e)}")
         raise HTTPException(500, f"Error al procesar datos del sensor: {str(e)}")
         
-    
-    # Obtenemos la información detallada de anomalías en la ventana de tiempo
-    info_anomalias = contar_anomalias(db, model_class, lectura.tiempo_ejecucion)
+
+    # OPTIMIZACIÓN: Usar versión con cache
+    info_anomalias = contar_anomalias_cached(db, model_class, lectura.tiempo_ejecucion)
     conteo_anomalias = info_anomalias['conteo']
 
     
