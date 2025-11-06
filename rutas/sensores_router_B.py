@@ -821,12 +821,14 @@ def nivel_numerico(nivel: str) -> int:
 def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str, model_class):
     """
     Lógica común de clasificación, conteo incremental/decremental y generación de alertas.
+
+    Si recibe id_sensor, actualiza el registro específico.
+    Si no, busca por tiempo_sensor o crea uno nuevo.
     """
     try:
         clase = predecir_sensores_np(modelos[modelo_key], sensor.valor)
         descripcion = "Normal" if clase == 1 else "Anomalía"
 
-        # Intentar recuperar la lectura con manejo de excepciones
         # Obtener último registro para conocer el contador previo
         try:
             ultima = db.query(model_class).order_by(model_class.id.desc()).first()
@@ -835,27 +837,47 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             logger.error(f"Error al acceder a la base de datos: {str(db_error)}")
             contador_anterior = 0
 
-        # Buscar registro existente o crear uno nuevo
-        lectura = db.query(model_class).filter(
-            model_class.tiempo_sensor == sensor.tiempo_sensor
-        ).first()
-        
-        if lectura:
-            # Actualizar registro existente
+        # NUEVA LÓGICA: Si viene id_sensor, actualizar ese registro específico
+        if sensor.id_sensor:
+            # Buscar por ID específico
+            lectura = db.query(model_class).filter(
+                model_class.id == sensor.id_sensor
+            ).first()
+
+            if not lectura:
+                logger.error(f"Registro con id {sensor.id_sensor} no encontrado")
+                raise HTTPException(404, f"Registro con id {sensor.id_sensor} no encontrado")
+
+            # Guardar valor anterior del contador
+            contador_anterior = lectura.contador_anomalias if hasattr(lectura, 'contador_anomalias') else 0
+
+            # Actualizar el registro con la nueva clasificación
             lectura.clasificacion = clase
-            lectura.valor_sensor = sensor.valor
-            lectura.tiempo_ejecucion = sensor.tiempo_sensor
-            lectura.tiempo_sensor = sensor.tiempo_sensor
+            logger.info(f"Registro ID {sensor.id_sensor} actualizado: clasificacion={clase}, valor={sensor.valor}")
+
         else:
-            # Crear nuevo registro solo si no existe
-            lectura = model_class(
-                tiempo_ejecucion=sensor.tiempo_sensor,
-                tiempo_sensor=sensor.tiempo_sensor,
-                valor_sensor=sensor.valor,
-                clasificacion=clase,
-                contador_anomalias=0
-            )
-            db.add(lectura)
+            # Comportamiento original: buscar por tiempo_sensor o crear nuevo
+            lectura = db.query(model_class).filter(
+                model_class.tiempo_sensor == sensor.tiempo_sensor
+            ).first()
+
+            if lectura:
+                # Actualizar registro existente
+                lectura.clasificacion = clase
+                lectura.valor_sensor = sensor.valor
+                lectura.tiempo_ejecucion = sensor.tiempo_sensor
+                lectura.tiempo_sensor = sensor.tiempo_sensor
+            else:
+                # Crear nuevo registro solo si no existe
+                lectura = model_class(
+                    tiempo_ejecucion=sensor.tiempo_sensor,
+                    tiempo_sensor=sensor.tiempo_sensor,
+                    valor_sensor=sensor.valor,
+                    clasificacion=clase,
+                    contador_anomalias=0
+                )
+                db.add(lectura)
+
     except Exception as e:
         logger.error(f"Error general en procesar(): {str(e)}")
         raise HTTPException(500, f"Error al procesar datos del sensor: {str(e)}")

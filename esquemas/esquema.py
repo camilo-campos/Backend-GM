@@ -1,13 +1,15 @@
 from pydantic import BaseModel , Field
-from typing import List
+from typing import List, Optional
 
 class DatosSensores(BaseModel):
     datos: List[List[float]]
     fecha:str# Lista de listas de valores flotantes
-    
+
 
 class SensorInput(BaseModel):
     valor: float
+    id_sensor: Optional[int] = None  # ID del sensor para actualizar registro específico
+    tiempo_sensor: Optional[str] = None  # Tiempo del sensor para compatibilidad
     
     
 class BitacoraInput(BaseModel):
