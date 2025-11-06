@@ -905,6 +905,21 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']} - {alerta_info['conteo_anomalias']} anomalías consecutivas ({alerta_info['porcentaje_umbral']}% del umbral crítico)\n"
                 mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
+                # Añadir el día en que se recibió el dato del sensor
+                try:
+                    if isinstance(sensor.tiempo_sensor, str):
+                        dia_lectura = sensor.tiempo_sensor[:10]
+                    else:
+                        dia_lectura = sensor.tiempo_sensor.strftime("%Y-%m-%d")
+                except Exception:
+                    try:
+                        if isinstance(lectura.tiempo_ejecucion, datetime):
+                            dia_lectura = lectura.tiempo_ejecucion.strftime("%Y-%m-%d")
+                        else:
+                            dia_lectura = str(lectura.tiempo_ejecucion)[:10]
+                    except Exception:
+                        dia_lectura = datetime.now().strftime("%Y-%m-%d")
+                mensaje += f"\nDía de lectura: {dia_lectura}"
                 
                 alerta = Alerta(
                     sensor_id=lectura.id,

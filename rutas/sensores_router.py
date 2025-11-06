@@ -807,6 +807,37 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         clase = predecir_sensores_np(modelos[modelo_key], sensor.valor)
         descripcion = "Normal" if clase == 1 else "Anomalía"
         tiempo_actual = datetime.now()
+        # Usar el día/fecha que viene en el dato del sensor (no el día actual del backend)
+        # Intentamos parsear sensor.tiempo_sensor a datetime. Si sólo trae hora, se combinará con la fecha del día actual.
+        sensor_dt = None
+        try:
+            if hasattr(sensor, 'tiempo_sensor') and sensor.tiempo_sensor is not None:
+                if isinstance(sensor.tiempo_sensor, datetime):
+                    sensor_dt = sensor.tiempo_sensor
+                elif isinstance(sensor.tiempo_sensor, str):
+                    # Intentar formatos comunes (ISO y variantes)
+                    try:
+                        sensor_dt = datetime.fromisoformat(sensor.tiempo_sensor.replace('Z', '+00:00'))
+                    except Exception:
+                        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
+                            try:
+                                sensor_dt = datetime.strptime(sensor.tiempo_sensor, fmt)
+                                break
+                            except Exception:
+                                pass
+                        # Si viene sólo la hora, combinamos con la fecha del servidor (recomendado enviar fecha completa)
+                        if not sensor_dt:
+                            for fmt in ("%H:%M:%S", "%H:%M"):
+                                try:
+                                    hora_tmp = datetime.strptime(sensor.tiempo_sensor, fmt).time()
+                                    sensor_dt = datetime.combine(tiempo_actual.date(), hora_tmp)
+                                    break
+                                except Exception:
+                                    pass
+            if not sensor_dt:
+                sensor_dt = tiempo_actual
+        except Exception:
+            sensor_dt = tiempo_actual
 
         # LÓGICA UNIFICADA: Siempre buscar y actualizar el registro existente del sensor
         try:
@@ -819,8 +850,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 # No existe registro previo, crear nuevo
                 logger.info(f"No se encontró registro previo. Creando nuevo registro para sensor.")
                 lectura = model_class(
-                    tiempo_ejecucion=tiempo_actual,
-                    tiempo_sensor=tiempo_actual.strftime("%H:%M:%S"),
+                    tiempo_ejecucion=sensor_dt,
+                    tiempo_sensor=(sensor.tiempo_sensor if isinstance(sensor.tiempo_sensor, str) else sensor_dt.strftime("%Y-%m-%d %H:%M:%S")),
                     valor_sensor=sensor.valor,
                     clasificacion=clase,
                     contador_anomalias=0
@@ -836,8 +867,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 # Actualizar valores del registro existente
                 lectura.clasificacion = clase
                 lectura.valor_sensor = sensor.valor
-                lectura.tiempo_ejecucion = tiempo_actual
-                lectura.tiempo_sensor = tiempo_actual.strftime("%H:%M:%S")
+                lectura.tiempo_ejecucion = sensor_dt
+                lectura.tiempo_sensor = (sensor.tiempo_sensor if isinstance(sensor.tiempo_sensor, str) else sensor_dt.strftime("%Y-%m-%d %H:%M:%S"))
                 
                 tipo_valor = "anomalía" if clase == -1 else "normal"
                 logger.info(f"Actualizando registro existente ID: {lectura.id} con valor {tipo_valor}")
@@ -856,8 +887,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             logger.error(f"Error al acceder a la base de datos: {str(db_error)}")
             # Crear un objeto temporal en memoria como fallback
             lectura = model_class(
-                tiempo_ejecucion=tiempo_actual,
-                tiempo_sensor=tiempo_actual.strftime("%H:%M:%S"),
+                tiempo_ejecucion=sensor_dt,
+                tiempo_sensor=(sensor.tiempo_sensor if isinstance(sensor.tiempo_sensor, str) else sensor_dt.strftime("%Y-%m-%d %H:%M:%S")),
                 valor_sensor=sensor.valor,
                 clasificacion=clase,
                 contador_anomalias=0
@@ -919,6 +950,15 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']} - {alerta_info['conteo_anomalias']} anomalías en {VENTANA_HORAS} horas ({alerta_info['porcentaje_umbral']}% del umbral crítico)\n"
                 mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
+                # Añadir el día en que se recibió el dato del sensor
+                try:
+                    if isinstance(lectura.tiempo_ejecucion, datetime):
+                        dia_lectura = lectura.tiempo_ejecucion.strftime("%Y-%m-%d")
+                    else:
+                        dia_lectura = str(lectura.tiempo_ejecucion)[:10]
+                except Exception:
+                    dia_lectura = datetime.now().strftime("%Y-%m-%d")
+                mensaje += f"\nDía de lectura: {dia_lectura}"
                 
                 alerta = Alerta(
                     sensor_id=lectura.id,
