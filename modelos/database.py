@@ -81,11 +81,29 @@ def create_engine_with_retry(database_url, max_retries=5, initial_delay=2):
     raise last_exception
 
 
-# Crear engine con reintentos
-engine = create_engine_with_retry(DATABASE_URL)
+# Crear engine SIN verificar conexión inmediata (lazy)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Verifica conexiones antes de usarlas
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=3600,  # Recicla conexiones cada hora
+    connect_args={
+        "connect_timeout": 30,  # Aumentado a 30 segundos
+    }
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+# Verificar conexión al iniciar (opcional, comentar si causa problemas)
+try:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    logger.info("✅ Conexión a la base de datos exitosa!")
+except Exception as e:
+    logger.warning(f"⚠️ No se pudo conectar a la BD al inicio: {e}")
+    logger.warning("La aplicación intentará conectarse cuando sea necesario")
 
 # Función para obtener la sesión de la base de datos
 def get_db():
