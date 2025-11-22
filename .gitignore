@@ -39,10 +39,14 @@ instance/
 
 # Archivos sensibles
 .env
-.env.*
+.env.local
+.env.*.local
 secrets.json
 .ambiente
 .testeo
 testeo
+
+# PERMITIR el archivo de ejemplo
+!.env.example
 # Docker
 docker-compose.override.yml
