@@ -13,6 +13,8 @@ class Alerta(Base):
     timestamp = Column(DateTime, default=func.now())  # Fecha y hora de la alerta
     descripcion = Column(Text)  # Texto descriptivo de la alerta
     contador_anomalias = Column(Integer, default=0)
+    timestamp_inicio_anomalia = Column(DateTime, nullable=True)  # Inicio del periodo anomalo
+    timestamp_fin_anomalia = Column(DateTime, nullable=True)  # Fin del periodo anomalo
 
 
 

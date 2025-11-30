@@ -1,4 +1,3 @@
-from langchain_ibm import WatsonxLLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
@@ -7,6 +6,8 @@ import os
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
+# Verificar si estamos en modo local (sin WatsonX)
+USE_LOCAL_DB = os.getenv("USE_LOCAL_DB", "false").lower() == "true"
 
 # Configurar los parámetros del modelo
 parameters = {
@@ -21,14 +22,23 @@ api_key=os.getenv("apikey")
 #print(api_key)
 #meta-llama/llama-3-3-70b-instruct
 
-# Inicializar el modelo WatsonxLLM
-watsonx_llm = WatsonxLLM(
-    model_id="meta-llama/llama-3-3-70b-instruct",
-    url="https://us-south.ml.cloud.ibm.com",
-    project_id=proyecto_id,
-    apikey=api_key,
-    params=parameters
-)
+# Inicializar el modelo WatsonxLLM solo si no estamos en modo local
+watsonx_llm = None
+if not USE_LOCAL_DB:
+    try:
+        from langchain_ibm import WatsonxLLM
+        watsonx_llm = WatsonxLLM(
+            model_id="meta-llama/llama-3-3-70b-instruct",
+            url="https://us-south.ml.cloud.ibm.com",
+            project_id=proyecto_id,
+            apikey=api_key,
+            params=parameters
+        )
+    except Exception as e:
+        print(f"[WARN] No se pudo inicializar WatsonX: {e}")
+        watsonx_llm = None
+else:
+    print("[INFO] Modo local activo - WatsonX deshabilitado")
 
 # Crear un PromptTemplate
 template = """<|begin_of_text|>
@@ -199,7 +209,10 @@ template = """<|begin_of_text|>
 prompt = PromptTemplate.from_template(template)
 
 # Crear una cadena que combine el prompt y el modelo
-llm_chain = prompt | watsonx_llm | StrOutputParser()
+if watsonx_llm:
+    llm_chain = prompt | watsonx_llm | StrOutputParser()
+else:
+    llm_chain = None
 
 
 # Crear un PromptTemplate
@@ -270,4 +283,7 @@ template_2 = """<|begin_of_text|>
 prompt_2 = PromptTemplate.from_template(template_2)
 
 # Crear una cadena que combine el prompt y el modelo
-llm_chain_2 = prompt_2 | watsonx_llm | StrOutputParser()
+if watsonx_llm:
+    llm_chain_2 = prompt_2 | watsonx_llm | StrOutputParser()
+else:
+    llm_chain_2 = None

@@ -182,58 +182,110 @@ def predecir_sensores_optimizado(modelo_key, valor_tuple):
 
 VENTANA_HORAS = 8  # horas
 
-# ——— Configuración de umbrales por sensor ———
+# ——— Configuracion de umbrales por sensor ———
+# NOTA: Umbrales ajustados para pruebas con datos limitados (100 registros por sensor)
+# En produccion, restaurar valores originales segun analisis historico
 UMBRAL_SENSORES = {
     'prediccion_corriente': {
-        "umbral_minimo": 1,  # 50% de 202
-        "umbral_alerta": 2,   # 80% de 202
-        "umbral_critica": 202,
+        "umbral_minimo": 3,   # AVISO
+        "umbral_alerta": 8,   # ALERTA
+        "umbral_critica": 15, # CRITICA
     },
     'prediccion_salida-agua': {
-        "umbral_minimo": 49,   # 50% de 98
-        "umbral_alerta": 78,  # 80% de 98
-        "umbral_critica": 98,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_presion-agua': {
-        "umbral_minimo": 118,  # 50% de 235
-        "umbral_alerta": 188,  # 80% de 235
-        "umbral_critica": 235,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_mw-brutos-gas': {
-        "umbral_minimo": 56,  # 50% de 112
-        "umbral_alerta": 90,  # 80% de 112
-        "umbral_critica": 112,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temperatura-ambiental': {
-        "umbral_minimo": 14,   # 50% de 28
-        "umbral_alerta": 22,  # 80% de 28
-        "umbral_critica": 28,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temp-descanso-bomba-1a': {
-        "umbral_minimo": 86,  # 50% de 171
-        "umbral_alerta": 137,  # 80% de 171
-        "umbral_critica": 171,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temp-empuje-bomba-1a': {
-        "umbral_minimo": 55,  # 50% de 110
-        "umbral_alerta": 88,  # 80% de 110
-        "umbral_critica": 110,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temp-motor-bomba-1a': {
-        "umbral_minimo": 13,   # 50% de 25
-        "umbral_alerta": 20,  # 80% de 25
-        "umbral_critica": 25,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_vibracion-axial': {
-        "umbral_minimo": 29,   # 50% de 58
-        "umbral_alerta": 46,  # 80% de 58
-        "umbral_critica": 58,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_voltaje-barra': {
-        "umbral_minimo": 18,   # 50% de 36
-        "umbral_alerta": 29,  # 80% de 36
-        "umbral_critica": 36,
-    }
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_flujo-salida-12fpmfc': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_flujo-agua-domo-ap': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_flujo-agua-domo-mp': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_excentricidad-bomba': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_flujo-agua-recalentador': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_flujo-agua-vapor-alta': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_posicion-valvula-recirc': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_presion-agua-mp': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_presion-succion-baa': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_temperatura-estator': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
 }
 
 def predecir_sensores_np(modelo, valor):
@@ -1034,7 +1086,9 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                     tipo_sensor=umbral_key,
                     descripcion=mensaje,
                     timestamp=datetime.now(),
-                    contador_anomalias=lectura.contador_anomalias  # Guardar el contador actualizado
+                    contador_anomalias=lectura.contador_anomalias,
+                    timestamp_inicio_anomalia=info_anomalias.get('primera_anomalia'),
+                    timestamp_fin_anomalia=info_anomalias.get('ultima_anomalia')
                 )
                 db.add(alerta)
                 db.commit()

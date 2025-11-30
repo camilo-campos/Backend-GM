@@ -1,6 +1,6 @@
 """
 Módulo para verificación y traducción automática de bitácoras de inglés a español.
-Enfocado en traducir el texto original de la bitácora, no las clasificaciones.
+Incluye traducción del texto original y de las clasificaciones generadas por el modelo.
 Implementación asíncrona para soporte de múltiples usuarios.
 """
 
@@ -19,6 +19,143 @@ DetectorFactory.seed = 0
 
 # Cargar variables de entorno
 load_dotenv()
+
+# =============================================================================
+# TRADUCCIÓN DE CLASIFICACIONES (Inglés -> Español)
+# =============================================================================
+
+# Diccionario de mapeo para clasificaciones principales
+TRADUCCIONES_CLASIFICACION = {
+    # Categoría principal - Fallas de bomba HRSG
+    "HRSG Pump Failures": "Fallas de Bomba HRSG",
+
+    # Subcategorías de HRSG Pump Failures
+    "Overheating events in components associated with water pumps": "Eventos de sobrecalentamiento en componentes asociados a bombas de agua",
+    "Leakage in the HRSG (Water Leaks)": "Fugas en el HRSG (Fugas de agua)",
+    "Low flow problems in feed pumps": "Problemas de bajo flujo en bombas de alimentación",
+    "Abnormal pressure variations in the HRSG system": "Variaciones anormales de presión en el sistema HRSG",
+    "Events to Related HRSG Systems": "Eventos relacionados con sistemas HRSG",
+    "Failures in Related HRSG": "Fallas en sistemas relacionados con HRSG",
+    "Failures in HRSG-related systems": "Fallas en sistemas relacionados con HRSG",
+    "Vibrations associated with water pumps": "Vibraciones asociadas a bombas de agua",
+
+    # Otras categorías principales
+    "Other Pump Failures": "Otras Fallas de Bombas",
+    "Leaks and Leakages": "Fugas y Filtraciones",
+    "Frequency and Load Events": "Eventos de Frecuencia y Carga",
+    "Operational Measurements": "Mediciones Operacionales",
+    "Fuel Changeover": "Cambio de Combustible",
+    "Other operational events": "Otros eventos operacionales",
+}
+
+
+def traducir_clasificacion(clasificacion_ingles: str) -> str:
+    """
+    Traduce una clasificación de inglés a español.
+
+    Args:
+        clasificacion_ingles: Clasificación en inglés del modelo LLM
+
+    Returns:
+        Clasificación traducida al español
+    """
+    if not clasificacion_ingles:
+        return clasificacion_ingles
+
+    clasificacion_limpia = clasificacion_ingles.strip()
+
+    # Buscar traducción exacta
+    if clasificacion_limpia in TRADUCCIONES_CLASIFICACION:
+        return TRADUCCIONES_CLASIFICACION[clasificacion_limpia]
+
+    # Buscar si contiene alguna de las claves (para clasificaciones compuestas)
+    # Ejemplo: "HRSG Pump Failures - Vibrations associated with water pumps"
+    resultado = clasificacion_limpia
+    for ingles, español in TRADUCCIONES_CLASIFICACION.items():
+        if ingles in resultado:
+            resultado = resultado.replace(ingles, español)
+
+    return resultado
+
+
+def traducir_clasificacion_bitacora(bitacora, db: Session) -> Dict:
+    """
+    Traduce la clasificación de una bitácora de inglés a español y actualiza la BD.
+
+    Args:
+        bitacora: Objeto bitácora (Bitacora o BitacoraB)
+        db: Sesión de base de datos
+
+    Returns:
+        Diccionario con resultado de la operación
+    """
+    resultado = {
+        "bitacora_id": bitacora.id if bitacora else None,
+        "clasificacion_original": None,
+        "clasificacion_traducida": None,
+        "traduccion_realizada": False
+    }
+
+    if not bitacora or not bitacora.clasificacion:
+        return resultado
+
+    clasificacion_original = bitacora.clasificacion
+    resultado["clasificacion_original"] = clasificacion_original
+
+    # Traducir la clasificación
+    clasificacion_traducida = traducir_clasificacion(clasificacion_original)
+
+    # Solo actualizar si hubo cambio
+    if clasificacion_traducida != clasificacion_original:
+        bitacora.clasificacion = clasificacion_traducida
+        db.add(bitacora)
+        db.commit()
+        db.refresh(bitacora)
+
+        resultado["clasificacion_traducida"] = clasificacion_traducida
+        resultado["traduccion_realizada"] = True
+        print(f"✅ Clasificación traducida: '{clasificacion_original}' -> '{clasificacion_traducida}'")
+
+    return resultado
+
+
+async def traducir_clasificacion_async(bitacora_id: int, db: Session) -> Dict:
+    """
+    Traduce la clasificación de una bitácora de forma asíncrona.
+
+    Args:
+        bitacora_id: ID de la bitácora
+        db: Sesión de base de datos
+
+    Returns:
+        Resultado de la traducción
+    """
+    resultado = {
+        "bitacora_id": bitacora_id,
+        "traduccion_realizada": False,
+        "errores": []
+    }
+
+    try:
+        # Buscar en tabla Bitacora
+        bitacora = db.query(Bitacora).filter(Bitacora.id == bitacora_id).first()
+
+        # Si no se encuentra, buscar en BitacoraB
+        if not bitacora:
+            bitacora = db.query(BitacoraB).filter(BitacoraB.id == bitacora_id).first()
+
+        if not bitacora:
+            resultado["errores"].append(f"Bitácora {bitacora_id} no encontrada")
+            return resultado
+
+        # Traducir clasificación
+        resultado_traduccion = traducir_clasificacion_bitacora(bitacora, db)
+        resultado.update(resultado_traduccion)
+
+    except Exception as e:
+        resultado["errores"].append(f"Error: {str(e)}")
+
+    return resultado
 
 class TraductorBitacoras:
     """Clase para manejar la traducción asíncrona de bitácoras industriales."""

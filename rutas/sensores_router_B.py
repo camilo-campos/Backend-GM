@@ -256,110 +256,109 @@ def predecir_sensores_optimizado(modelo_key, valor_tuple):
 
 VENTANA_HORAS = 8  # horas
 
-# ——— Configuración de umbrales por sensor ———
+# ——— Configuracion de umbrales por sensor ———
+# NOTA: Umbrales ajustados para pruebas con datos limitados (100 registros por sensor)
+# En produccion, restaurar valores originales segun analisis historico
 UMBRAL_SENSORES = {
-    # Sensores existentes con nombres corregidos
     'prediccion_corriente': {
-        "umbral_minimo": 1,  # Cambiado para testing
-        "umbral_alerta": 2,   # Cambiado para testing
-        "umbral_critica": 3,  # Cambiado para testing
+        "umbral_minimo": 3,   # AVISO
+        "umbral_alerta": 8,   # ALERTA
+        "umbral_critica": 15, # CRITICA
     },
-    'prediccion_presion_agua': {  # Corregido de prediccion_presion-agua
-        "umbral_minimo": 1,  # Cambiado para testing
-        "umbral_alerta": 2,  # Cambiado para testing
-        "umbral_critica": 3,  # Cambiado para testing
+    'prediccion_presion_agua': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
-    'prediccion_temperatura_ambiental': {  # Corregido de prediccion_temperatura-ambiental
-        "umbral_minimo": 1,   # 50% de 2
-        "umbral_alerta": 2,  # 80% de 2
-        "umbral_critica": 2,
+    'prediccion_temperatura_ambiental': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
-    
-    # Nuevos sensores
     'prediccion_excentricidad_bomba': {
-        "umbral_minimo": 0,   # 50% de 0
-        "umbral_alerta": 0,   # 80% de 0
-        "umbral_critica": 0,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_flujo_descarga': {
-        "umbral_minimo": 66,   # 50% de 132
-        "umbral_alerta": 105,   # 80% de 132
-        "umbral_critica": 132,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_flujo_agua_domo_ap': {
-        "umbral_minimo": 39,   # 50% de 78
-        "umbral_alerta": 63,   # 80% de 78
-        "umbral_critica": 78,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_flujo_agua_domo_mp': {
-        "umbral_minimo": 22,   # 50% de 45
-        "umbral_alerta": 36,   # 80% de 45
-        "umbral_critica": 45,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_flujo_agua_recalentador': {
-        "umbral_minimo": 45,   # 50% de 91
-        "umbral_alerta": 73,   # 80% de 91
-        "umbral_critica": 91,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_flujo_agua_vapor_alta': {
-        "umbral_minimo": 13,   # 50% de 26
-        "umbral_alerta": 21,   # 80% de 26
-        "umbral_critica": 26,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temperatura_agua_alim': {
-        "umbral_minimo": 16,   # 50% de 32
-        "umbral_alerta": 26,   # 80% de 32
-        "umbral_critica": 32,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temperatura_estator': {
-        "umbral_minimo": 36,   # 50% de 73
-        "umbral_alerta": 58,   # 80% de 73
-        "umbral_critica": 73,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_vibracion_axial_empuje': {
-        "umbral_minimo": 52,   # 50% de 104
-        "umbral_alerta": 83,   # 80% de 104
-        "umbral_critica": 104,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_vibracion_x_descanso': {
-        "umbral_minimo": 67,   # 50% de 133
-        "umbral_alerta": 106,   # 80% de 133
-        "umbral_critica": 133,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_vibracion_y_descanso': {
-        "umbral_minimo": 54,   # 50% de 107
-        "umbral_alerta": 86,   # 80% de 107
-        "umbral_critica": 107,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_voltaje_barra': {
-        "umbral_minimo": 18,  # 50% de 35
-        "umbral_alerta": 28,  # 80% de 35
-        "umbral_critica": 35,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temp-descanso-bomba-1a': {
-        "umbral_minimo": 86,  # 50% de 171
-        "umbral_alerta": 137,  # 80% de 171
-        "umbral_critica": 171,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temp-empuje-bomba-1a': {
-        "umbral_minimo": 55,  # 50% de 110
-        "umbral_alerta": 88,  # 80% de 110
-        "umbral_critica": 110,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_temp-motor-bomba-1a': {
-        "umbral_minimo": 13,   # 50% de 25
-        "umbral_alerta": 20,  # 80% de 25
-        "umbral_critica": 25,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_vibracion-axial': {
-        "umbral_minimo": 29,   # 50% de 58
-        "umbral_alerta": 46,  # 80% de 58
-        "umbral_critica": 58,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     },
     'prediccion_voltaje-barra': {
-        "umbral_minimo": 18,   # 50% de 35
-        "umbral_alerta": 28,  # 80% de 35
-        "umbral_critica": 35,
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
     }
 }
 
@@ -1005,7 +1004,9 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                     tipo_sensor=umbral_key,
                     descripcion=mensaje,
                     timestamp=sensor.tiempo_sensor,
-                    contador_anomalias=conteo_anomalias  # Guardar el contador actual en la alerta
+                    contador_anomalias=conteo_anomalias,
+                    timestamp_inicio_anomalia=info_anomalias.get('primera_anomalia'),
+                    timestamp_fin_anomalia=info_anomalias.get('ultima_anomalia')
                 )
                 db.add(alerta)
                 db.commit()

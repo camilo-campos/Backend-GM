@@ -13,8 +13,21 @@ logger = logging.getLogger(__name__)
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
-# Obtener la URL de la base de datos desde la variable de entorno
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Detectar si usar base de datos local (SQLite) o produccion (PostgreSQL)
+USE_LOCAL_DB = os.getenv("USE_LOCAL_DB", "false").lower() == "true"
+
+if USE_LOCAL_DB:
+    # SQLite local para desarrollo/pruebas
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    SQLITE_PATH = os.path.join(BASE_DIR, "db_local.sqlite")
+    DATABASE_URL = f"sqlite:///{SQLITE_PATH}"
+    CONNECT_ARGS = {"check_same_thread": False}
+    logger.info(f"Usando SQLite local: {SQLITE_PATH}")
+else:
+    # PostgreSQL produccion
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    CONNECT_ARGS = {"connect_timeout": 30}
+    logger.info("Usando PostgreSQL de produccion")
 
 
 def create_engine_with_retry(database_url, max_retries=5, initial_delay=2):
@@ -81,17 +94,23 @@ def create_engine_with_retry(database_url, max_retries=5, initial_delay=2):
     raise last_exception
 
 
-# Crear engine SIN verificar conexión inmediata (lazy)
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,  # Verifica conexiones antes de usarlas
-    pool_size=5,
-    max_overflow=10,
-    pool_recycle=3600,  # Recicla conexiones cada hora
-    connect_args={
-        "connect_timeout": 30,  # Aumentado a 30 segundos
-    }
-)
+# Crear engine SIN verificar conexion inmediata (lazy)
+if USE_LOCAL_DB:
+    # SQLite no soporta pool_size ni max_overflow
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args=CONNECT_ARGS
+    )
+else:
+    # PostgreSQL con configuracion completa
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=3600,
+        connect_args=CONNECT_ARGS
+    )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

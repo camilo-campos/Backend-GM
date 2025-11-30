@@ -18,12 +18,12 @@ env/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Configuración de IDEs
+# Configuracion de IDEs
 .vscode/
 .idea/
 *.iml
 
-# Archivos de logs y caché
+# Archivos de logs y cache
 logs/
 *.log
 *.sqlite
@@ -46,7 +46,25 @@ secrets.json
 .testeo
 testeo
 
+# Datos exportados (no subir datos de produccion)
+datos_exportados.json
+
+# Claude Code (configuracion local)
+.claude/
+
+# Documentos privados (cotizaciones, presupuestos)
+COTIZACION_*.md
+PRESUPUESTO_*.md
+OPTIMIZACIONES*.md
+README_INDICES*.md
+
+# Windows
+NUL
+Thumbs.db
+desktop.ini
+
 # PERMITIR el archivo de ejemplo
 !.env.example
+
 # Docker
 docker-compose.override.yml
