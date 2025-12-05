@@ -116,7 +116,11 @@ async def get_todas_bitacoras(db: Session = Depends(get_db)):
 async def get_todas_bitacoras_fallas(db: Session = Depends(get_db)):
     try:
         bitacoras = await _get_and_classify_bitacoras(db)
-        fallas = [b for b in bitacoras if b.clasificacion and "HRSG Pump Failures" in b.clasificacion]
+        # Filtrar fallas HRSG en ambos idiomas (inglés y español)
+        fallas = [b for b in bitacoras if b.clasificacion and (
+            "HRSG Pump Failures" in b.clasificacion or
+            "Fallas de Bomba HRSG" in b.clasificacion
+        )]
         return {"message": "Consulta exitosa", "data": fallas}
     except Exception as e:
         print("Error:", e)

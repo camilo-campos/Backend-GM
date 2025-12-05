@@ -49,6 +49,9 @@ MAPEO_SENSORES_A = {
     "prediccion_temp-descanso-empuje": SensorTemperatura_descanso_interna_empuje_bomba_1aa,
     "prediccion_temp-descanso-motor": SensorTemperatura_descanso_interna_motor_bomba_1a,
     "prediccion_temp-descanso-interno": SensorTemperatura_descanso_interno_bomba_1a,
+    "prediccion_temp-descanso-bomba-1a": SensorTemperatura_descanso_interno_bomba_1a,  # Nombre usado en endpoint
+    "prediccion_temp-empuje-bomba-1a": SensorTemperatura_descanso_interna_empuje_bomba_1aa,  # Nombre usado en endpoint
+    "prediccion_temp-motor-bomba-1a": SensorTemperatura_descanso_interna_motor_bomba_1a,  # Nombre usado en endpoint
     "prediccion_vibracion-axial": SensorVibracion_axial_descanso,
     "prediccion_voltaje-barra": SensorVoltaje_barra,
     "prediccion_excentricidad": SensorExcentricidadBomba,
@@ -135,7 +138,6 @@ async def _get_and_classify_bitacoras(db: Session):
             "tipo_sensor": alerta.tipo_sensor,
             "timestamp": alerta.timestamp,
             "descripcion": alerta.descripcion,
-            "contador_anomalias": alerta.contador_anomalias,
             "origen": "Bomba A",
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,
@@ -150,7 +152,6 @@ async def _get_and_classify_bitacoras(db: Session):
             "tipo_sensor": alerta.tipo_sensor,
             "timestamp": alerta.timestamp,
             "descripcion": alerta.descripcion,
-            "contador_anomalias": alerta.contador_anomalias,
             "origen": "Bomba B",
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,

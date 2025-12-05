@@ -1067,19 +1067,22 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             
             # Solo generar nueva alerta si el nivel ha aumentado
             if curr_n > prev_n:
-                # Construir mensaje descriptivo
-                mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']} - {alerta_info['conteo_anomalias']} anomalías en {VENTANA_HORAS} horas ({alerta_info['porcentaje_umbral']}% del umbral crítico)\n"
+                # Construir mensaje descriptivo (simplificado según requerimiento del cliente)
+                # Formato: tipo de alerta, sensor, bomba, descripción, intervalo, acción recomendada
+
+                # Formatear intervalo de tiempo
+                inicio_anomalia = info_anomalias.get('primera_anomalia')
+                fin_anomalia = info_anomalias.get('ultima_anomalia')
+                if inicio_anomalia and fin_anomalia:
+                    intervalo = f"{inicio_anomalia.strftime('%Y-%m-%d %H:%M')} - {fin_anomalia.strftime('%Y-%m-%d %H:%M')}"
+                else:
+                    intervalo = "No disponible"
+
+                mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']}\n"
+                mensaje += f"Bomba: A\n"
                 mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
+                mensaje += f"Intervalo: {intervalo}\n"
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
-                # Añadir el día en que se recibió el dato del sensor
-                try:
-                    if isinstance(lectura.tiempo_ejecucion, datetime):
-                        dia_lectura = lectura.tiempo_ejecucion.strftime("%Y-%m-%d")
-                    else:
-                        dia_lectura = str(lectura.tiempo_ejecucion)[:10]
-                except Exception:
-                    dia_lectura = datetime.now().strftime("%Y-%m-%d")
-                mensaje += f"\nDía de lectura: {dia_lectura}"
                 
                 alerta = Alerta(
                     sensor_id=lectura.id,
