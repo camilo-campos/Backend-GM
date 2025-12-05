@@ -178,17 +178,34 @@ async def get_todas_bitacoras_fallas(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Error al conectar con la base de datos.")
 
 
-def _buscar_alerta(db: Session, alerta_id: int):
-    """Busca una alerta por ID en ambas tablas (A y B)"""
+def _buscar_alerta(db: Session, alerta_id: int, bomba: str = None):
+    """
+    Busca una alerta por ID. Si se especifica bomba, busca directamente en esa tabla.
+    Si no se especifica, busca en ambas (primero B, luego A para evitar colisiones).
+    """
+    # Si se especifica la bomba, buscar directamente en esa tabla
+    if bomba:
+        bomba_upper = bomba.upper()
+        if bomba_upper == "A":
+            alerta = db.query(AlertaA).filter(AlertaA.id == alerta_id).first()
+            if alerta:
+                return alerta, "A", MAPEO_SENSORES_A
+        elif bomba_upper == "B":
+            alerta = db.query(AlertaB).filter(AlertaB.id == alerta_id).first()
+            if alerta:
+                return alerta, "B", MAPEO_SENSORES_B
+        return None, None, None
+
+    # Si no se especifica bomba, buscar en ambas (primero B para evitar colisiones comunes)
+    # Buscar en Bomba B primero
+    alerta = db.query(AlertaB).filter(AlertaB.id == alerta_id).first()
+    if alerta:
+        return alerta, "B", MAPEO_SENSORES_B
+
     # Buscar en Bomba A
     alerta = db.query(AlertaA).filter(AlertaA.id == alerta_id).first()
     if alerta:
         return alerta, "A", MAPEO_SENSORES_A
-
-    # Buscar en Bomba B
-    alerta = db.query(AlertaB).filter(AlertaB.id == alerta_id).first()
-    if alerta:
-        return alerta, "B", MAPEO_SENSORES_B
 
     return None, None, None
 
@@ -206,15 +223,20 @@ def _obtener_datos_sensor(db: Session, modelo_sensor, timestamp_inicio, timestam
 @router.get("/{alerta_id}/datos_anomalia")
 async def get_datos_anomalia(
     alerta_id: int,
+    bomba: Optional[str] = Query(None, description="Bomba específica: 'A' o 'B'. Si no se especifica, busca en ambas."),
     db: Session = Depends(get_db)
 ):
     """
     Obtiene los datos del sensor durante el periodo de anomalia de una alerta especifica.
     Permite recrear el grafico del momento exacto de la anomalia.
+
+    Parámetros:
+    - alerta_id: ID de la alerta
+    - bomba: 'A' o 'B' para especificar la bomba (recomendado para evitar colisiones de ID)
     """
     try:
-        # Buscar la alerta
-        alerta, bomba, mapeo_sensores = _buscar_alerta(db, alerta_id)
+        # Buscar la alerta (con bomba específica si se proporciona)
+        alerta, bomba_encontrada, mapeo_sensores = _buscar_alerta(db, alerta_id, bomba)
 
         if not alerta:
             raise HTTPException(status_code=404, detail=f"Alerta con ID {alerta_id} no encontrada")
@@ -264,7 +286,7 @@ async def get_datos_anomalia(
         return {
             "alerta_id": alerta_id,
             "tipo_sensor": alerta.tipo_sensor,
-            "bomba": bomba,
+            "bomba": bomba_encontrada,
             "periodo_anomalo": {
                 "timestamp_inicio": alerta.timestamp_inicio_anomalia.isoformat(),
                 "timestamp_fin": alerta.timestamp_fin_anomalia.isoformat(),
@@ -291,16 +313,23 @@ async def get_datos_anomalia_contexto(
     alerta_id: int,
     minutos_antes: int = Query(default=30, ge=0, le=120, description="Minutos de contexto antes del periodo anomalo"),
     minutos_despues: int = Query(default=30, ge=0, le=120, description="Minutos de contexto despues del periodo anomalo"),
+    bomba: Optional[str] = Query(None, description="Bomba específica: 'A' o 'B'. Si no se especifica, busca en ambas."),
     db: Session = Depends(get_db)
 ):
     """
     Obtiene los datos del sensor con contexto temporal extendido.
     Incluye datos ANTES y DESPUES del periodo anomalo para visualizar
     el comportamiento previo y la recuperacion del sensor.
+
+    Parámetros:
+    - alerta_id: ID de la alerta
+    - minutos_antes: Contexto previo al periodo anómalo (0-120)
+    - minutos_despues: Contexto posterior al periodo anómalo (0-120)
+    - bomba: 'A' o 'B' para especificar la bomba (recomendado para evitar colisiones de ID)
     """
     try:
-        # Buscar la alerta
-        alerta, bomba, mapeo_sensores = _buscar_alerta(db, alerta_id)
+        # Buscar la alerta (con bomba específica si se proporciona)
+        alerta, bomba_encontrada, mapeo_sensores = _buscar_alerta(db, alerta_id, bomba)
 
         if not alerta:
             raise HTTPException(status_code=404, detail=f"Alerta con ID {alerta_id} no encontrada")
@@ -360,7 +389,7 @@ async def get_datos_anomalia_contexto(
         return {
             "alerta_id": alerta_id,
             "tipo_sensor": alerta.tipo_sensor,
-            "bomba": bomba,
+            "bomba": bomba_encontrada,
             "periodo_anomalo": {
                 "timestamp_inicio": alerta.timestamp_inicio_anomalia.isoformat(),
                 "timestamp_fin": alerta.timestamp_fin_anomalia.isoformat(),
