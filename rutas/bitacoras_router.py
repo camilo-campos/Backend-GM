@@ -132,7 +132,8 @@ async def get_todas_bitacoras_fallas(db: Session = Depends(get_db)):
         # Filtrar fallas HRSG en ambos idiomas (inglés y español)
         fallas = [b for b in bitacoras if b.clasificacion and (
             "HRSG Pump Failures" in b.clasificacion or
-            "Fallas de Bomba HRSG" in b.clasificacion
+            "Fallas de Bomba HRSG" in b.clasificacion or
+            "Fallas de Bombas HRSG" in b.clasificacion
         )]
         return {"message": "Consulta exitosa", "data": fallas}
     except Exception as e:
