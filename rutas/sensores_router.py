@@ -800,17 +800,14 @@ def determinar_alerta(info_anomalias: dict, umbral_sensor_key: str, bomba_id: st
     if nivel:
         # Agregar identificación de bomba al nombre del sensor
         nombre_sensor_con_bomba = f"{sensor_info['nombre']} - BOMBA {bomba_id}"
-        
-        # Crear mensaje temporal detallado
-        mensaje_temporal = _crear_mensaje_temporal(info_anomalias, nivel)
-        
-        # Crear descripción enriquecida con información temporal
-        descripcion_enriquecida = f"{sensor_info['descripcion']}. {mensaje_temporal}"
-        
+
+        # Descripción simplificada (sin información técnica de anomalías)
+        descripcion_simplificada = sensor_info['descripcion']
+
         return {
             "nivel": nivel,
             "nombre_sensor": nombre_sensor_con_bomba,
-            "descripcion_sensor": descripcion_enriquecida,
+            "descripcion_sensor": descripcion_simplificada,
             "accion_recomendada": sensor_info['acciones'].get(nivel, ""),
             "porcentaje_umbral": porcentaje,
             "conteo_anomalias": conteo,
