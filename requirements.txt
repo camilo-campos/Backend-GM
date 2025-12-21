@@ -12,3 +12,6 @@ langchain_core
 python-dotenv
 langdetect
 openai
+python-jose[cryptography]
+httpx
+cachetools
