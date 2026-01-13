@@ -99,24 +99,31 @@ MAPEO_SENSORES_B = {
 
 router = APIRouter(prefix="/alertas_umbral", tags=["alertas_umbral"])
 
-async def _get_and_classify_bitacoras(db: Session):
+async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
     """
-    Obtiene las últimas alertas de ambas bombas (A y B) y las combina en una sola lista
+    Obtiene las alertas de los últimos N días de ambas bombas (A y B) y las combina en una sola lista
     ordenada por timestamp de manera descendente (las más recientes primero).
+
+    Args:
+        db: Sesión de base de datos
+        dias: Número de días hacia atrás para filtrar alertas (por defecto 2)
     """
-    # Obtener alertas de la bomba A
+    # Calcular fecha límite según los días especificados
+    fecha_limite = datetime.now() - timedelta(days=dias)
+
+    # Obtener alertas de la bomba A de los últimos 2 días
     alertas_a = (
         db.query(AlertaA)
+          .filter(AlertaA.timestamp >= fecha_limite)
           .order_by(AlertaA.id.desc())
-          .limit(40)
           .all()
     )
-    
-    # Obtener alertas de la bomba B
+
+    # Obtener alertas de la bomba B de los últimos 2 días
     alertas_b = (
         db.query(AlertaB)
+          .filter(AlertaB.timestamp >= fecha_limite)
           .order_by(AlertaB.id.desc())
-          .limit(40)
           .all()
     )
     
@@ -161,18 +168,33 @@ async def _get_and_classify_bitacoras(db: Session):
     
     # Ordenar por timestamp descendente (las más recientes primero)
     alertas_formateadas.sort(key=lambda x: x["timestamp"], reverse=True)
-    
-    # Limitar a las 40 alertas más recientes
-    return alertas_formateadas[:40]
+
+    # Retornar todas las alertas de los últimos 2 días (sin límite)
+    return alertas_formateadas
 
 
-# Ruta GET filtrando solo fallas
+# Ruta GET para obtener alertas con filtro de días configurable
 @router.get("/todas_alertas")
-async def get_todas_bitacoras_fallas(db: Session = Depends(get_db)):
-    try:
-        alertas = await _get_and_classify_bitacoras(db)
+async def get_todas_alertas(
+    dias: int = Query(default=2, ge=1, le=30, description="Número de días hacia atrás para filtrar alertas (1-30)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene todas las alertas de ambas bombas filtradas por rango de tiempo.
 
-        return {"message": "Consulta exitosa", "data": alertas}
+    Parámetros:
+    - dias: Número de días hacia atrás (1-30). Por defecto 2 días.
+      Ejemplos: 1 (último día), 2 (últimos 2 días), 7 (última semana), 30 (último mes)
+    """
+    try:
+        alertas = await _get_and_classify_bitacoras(db, dias=dias)
+
+        return {
+            "message": "Consulta exitosa",
+            "filtro_dias": dias,
+            "total_alertas": len(alertas),
+            "data": alertas
+        }
     except Exception as e:
         print("Error:", e)
         raise HTTPException(status_code=500, detail="Error al conectar con la base de datos.")
