@@ -1094,7 +1094,8 @@ async def _get_and_classify(
     model_key,
     default_data,
     inicio: Optional[str] = None,
-    termino: Optional[str] = None
+    termino: Optional[str] = None,
+    limite: int = 40
 ):
     # Convertir strings a datetime si están presentes
     try:
@@ -1116,7 +1117,7 @@ async def _get_and_classify(
         sensores = (
             db.query(SensorModel)
               .order_by(SensorModel.id.desc())
-              .limit(40)
+              .limit(limite)
               .all()
         )
 
@@ -1273,123 +1274,138 @@ async def obtener_predicciones_bomba(
 
 @router_b.get("/corriente")
 async def get_sensores_corriente(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorCorriente, "corriente_motor", DEFAULT_SENSORES_CORRIENTE, inicio, termino)
+    return await _get_and_classify(db, SensorCorriente, "corriente_motor", DEFAULT_SENSORES_CORRIENTE, inicio, termino, limite)
 
 @router_b.get("/excentricidad_bomba")
 async def get_sensores_excentricidad_bomba(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorExcentricidadBomba, "excentricidad_bomba", DEFAULT_SENSORES_EXCENTRICIDAD, inicio, termino)
+    return await _get_and_classify(db, SensorExcentricidadBomba, "excentricidad_bomba", DEFAULT_SENSORES_EXCENTRICIDAD, inicio, termino, limite)
 
 @router_b.get("/flujo_descarga")
 async def get_sensores_flujo_descarga(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorFlujoDescarga, "flujo_descarga", DEFAULT_SENSORES_FLUJO_DESCARGA, inicio, termino)
+    return await _get_and_classify(db, SensorFlujoDescarga, "flujo_descarga", DEFAULT_SENSORES_FLUJO_DESCARGA, inicio, termino, limite)
 
 @router_b.get("/flujo_agua_domo_ap")
 async def get_sensores_flujo_agua_domo_ap(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorFlujoAguaDomoAP, "flujo_agua_domo_ap", DEFAULT_SENSORES_FLUJO_AGUA_DOMO_AP, inicio, termino)
+    return await _get_and_classify(db, SensorFlujoAguaDomoAP, "flujo_agua_domo_ap", DEFAULT_SENSORES_FLUJO_AGUA_DOMO_AP, inicio, termino, limite)
 
 @router_b.get("/flujo_agua_domo_mp")
 async def get_sensores_flujo_agua_domo_mp(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorFlujoAguaDomoMP, "flujo_agua_domo_mp", DEFAULT_SENSORES_FLUJO_AGUA_DOMO_MP, inicio, termino)
+    return await _get_and_classify(db, SensorFlujoAguaDomoMP, "flujo_agua_domo_mp", DEFAULT_SENSORES_FLUJO_AGUA_DOMO_MP, inicio, termino, limite)
 
 @router_b.get("/flujo_agua_recalentador")
 async def get_sensores_flujo_agua_recalentador(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorFlujoAguaRecalentador, "flujo_agua_recalentador", DEFAULT_SENSORES_FLUJO_AGUA_RECALENTADOR, inicio, termino)
+    return await _get_and_classify(db, SensorFlujoAguaRecalentador, "flujo_agua_recalentador", DEFAULT_SENSORES_FLUJO_AGUA_RECALENTADOR, inicio, termino, limite)
 
 @router_b.get("/flujo_agua_vapor_alta")
 async def get_sensores_flujo_agua_vapor_alta(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorFlujoAguaVaporAlta, "flujo_agua_vapor_alta", DEFAULT_SENSORES_FLUJO_AGUA_VAPOR_ALTA, inicio, termino)
+    return await _get_and_classify(db, SensorFlujoAguaVaporAlta, "flujo_agua_vapor_alta", DEFAULT_SENSORES_FLUJO_AGUA_VAPOR_ALTA, inicio, termino, limite)
 
 @router_b.get("/presion_agua")
 async def get_sensores_presion_agua(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorPresionAgua, "presion_agua", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino)
+    return await _get_and_classify(db, SensorPresionAgua, "presion_agua", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
 @router_b.get("/temperatura_ambiental")
 async def get_sensores_temperatura_ambiental(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorTemperaturaAmbiental, "temperatura_ambiental", DEFAULT_SENSORES_TEMPERATURA_AMBIENTAL, inicio, termino)
+    return await _get_and_classify(db, SensorTemperaturaAmbiental, "temperatura_ambiental", DEFAULT_SENSORES_TEMPERATURA_AMBIENTAL, inicio, termino, limite)
 
 @router_b.get("/temperatura_agua_alim")
 async def get_sensores_temperatura_agua_alim(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorTemperaturaAguaAlim, "temperatura_agua_alim", DEFAULT_SENSORES_TEMPERATURA_AGUA_ALIM, inicio, termino)
+    return await _get_and_classify(db, SensorTemperaturaAguaAlim, "temperatura_agua_alim", DEFAULT_SENSORES_TEMPERATURA_AGUA_ALIM, inicio, termino, limite)
 
 @router_b.get("/temperatura_estator")
 async def get_sensores_temperatura_estator(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorTemperaturaEstator, "temperatura_estator", DEFAULT_SENSORES_TEMPERATURA_ESTATOR, inicio, termino)
+    return await _get_and_classify(db, SensorTemperaturaEstator, "temperatura_estator", DEFAULT_SENSORES_TEMPERATURA_ESTATOR, inicio, termino, limite)
 
 @router_b.get("/vibracion_axial_empuje")
 async def get_sensores_vibracion_axial_empuje(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorVibracionAxialEmpuje, "vibracion_axial_empuje", DEFAULT_SENSORES_VIBRACION_AXIAL_EMPUJE, inicio, termino)
+    return await _get_and_classify(db, SensorVibracionAxialEmpuje, "vibracion_axial_empuje", DEFAULT_SENSORES_VIBRACION_AXIAL_EMPUJE, inicio, termino, limite)
 
 @router_b.get("/vibracion_x_descanso")
 async def get_sensores_vibracion_x_descanso(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorVibracionXDescanso, "vibracion_x_descanso", DEFAULT_SENSORES_VIBRACION_X_DESCANSO, inicio, termino)
+    return await _get_and_classify(db, SensorVibracionXDescanso, "vibracion_x_descanso", DEFAULT_SENSORES_VIBRACION_X_DESCANSO, inicio, termino, limite)
 
 @router_b.get("/vibracion_y_descanso")
 async def get_sensores_vibracion_y_descanso(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorVibracionYDescanso, "vibracion_y_descanso", DEFAULT_SENSORES_VIBRACION_Y_DESCANSO, inicio, termino)
+    return await _get_and_classify(db, SensorVibracionYDescanso, "vibracion_y_descanso", DEFAULT_SENSORES_VIBRACION_Y_DESCANSO, inicio, termino, limite)
 
 @router_b.get("/voltaje_barra")
 async def get_sensores_voltaje_barra(
-    inicio: Optional[str] = Query(None), 
-    termino: Optional[str] = Query(None), 
+    inicio: Optional[str] = Query(None),
+    termino: Optional[str] = Query(None),
+    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorVoltajeBarra, "voltaje_barra", DEFAULT_SENSORES_VOLTAJE_BARRA, inicio, termino)
+    return await _get_and_classify(db, SensorVoltajeBarra, "voltaje_barra", DEFAULT_SENSORES_VOLTAJE_BARRA, inicio, termino, limite)
 
 
 
