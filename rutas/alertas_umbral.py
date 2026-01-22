@@ -176,7 +176,7 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
 # Ruta GET para obtener alertas con filtro de días configurable
 @router.get("/todas_alertas")
 async def get_todas_alertas(
-    dias: int = Query(default=2, ge=1, le=30, description="Número de días hacia atrás para filtrar alertas (1-30)"),
+    dias: int = Query(default=2, ge=1, le=90, description="Número de días hacia atrás para filtrar alertas (1-90)"),
     db: Session = Depends(get_db)
 ):
     """

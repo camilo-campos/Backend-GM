@@ -68,3 +68,13 @@ desktop.ini
 
 # Docker
 docker-compose.override.yml
+
+# Scripts de utilidad local (no subir)
+utils/crear_db_local.py
+utils/crear_indices_optimizacion.sql
+utils/descargar_datos.py
+utils/diagnostico_timestamps.sql
+utils/simular_datos_directo.py
+utils/simular_envio_sensores.py
+utils/simular_flujo_completo.py
+utils/verificar_bitacoras.py

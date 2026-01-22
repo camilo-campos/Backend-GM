@@ -242,7 +242,7 @@ def predecir_sensores(datos, modelo):
     Convierte datos en DataFrame y aplica modelo para predecir 1 o -1.
     """
     df_nuevo = pd.DataFrame(datos, columns=["valor"])
-    return modelo.predict(df_nuevo).tolist()
+    return modelo.predict(df_nuevo.values).tolist()
 
 # Versión optimizada para predicción de un solo valor con caché
 @lru_cache(maxsize=128)
@@ -252,7 +252,7 @@ def predecir_sensores_optimizado(modelo_key, valor_tuple):
     """
     modelo = ModelRegistry.get_model(modelo_key)
     X = pd.DataFrame([valor_tuple], columns=["valor"])
-    return modelo.predict(X)[0]
+    return modelo.predict(X.values)[0]
 
 VENTANA_HORAS = 8  # horas
 
@@ -945,10 +945,9 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
     
     # Ajustar contador según la clasificación
     if clase == 1:  # Si es normal
-        # Decrementamos el contador previo en 1, pero nunca por debajo de 0
-        nuevo_contador = max(0, contador_anterior - 1)
-        lectura.contador_anomalias = nuevo_contador
-        print(f"[{umbral_key}] Valor normal. Contador decrementado de {contador_anterior} a {nuevo_contador}")
+        # El contador se mantiene igual, no se modifica
+        lectura.contador_anomalias = contador_anterior
+        print(f"[{umbral_key}] Valor normal. Contador se mantiene en {contador_anterior}")
     else:  # Si es anomalía
         # Para anomalías usamos el conteo real de la ventana de tiempo
         lectura.contador_anomalias = conteo_anomalias
@@ -1006,6 +1005,12 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 )
                 db.add(alerta)
                 db.commit()
+
+                # Si alcanzamos nivel CRÍTICA, reiniciar contador a 0
+                if alerta_info["nivel"] == "CRÍTICA":
+                    lectura.contador_anomalias = 0
+                    db.commit()
+                    print(f"[{umbral_key}] Nivel CRÍTICO alcanzado. Contador reiniciado a 0")
 
     return {
         "id_registro": lectura.id,
@@ -1189,9 +1194,9 @@ async def predecir_bomba_b(
         logger.info(f"DataFrame de entrada preparado con shape: {input_data.shape}")
         
         # Realizar la predicción y obtener probabilidades
-        prediccion = model.predict(input_data)
+        prediccion = model.predict(input_data.values)
         # Obtener probabilidades para cada clase
-        probabilidades = model.predict_proba(input_data)
+        probabilidades = model.predict_proba(input_data.values)
         
         # Obtenemos siempre la probabilidad de falla (clase 1)
         # En modelos binarios predict_proba devuelve probabilidades para [clase 0, clase 1]
