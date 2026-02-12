@@ -97,7 +97,7 @@ MAPEO_SENSORES_B = {
 }
 
 
-router = APIRouter(prefix="/alertas_umbral", tags=["alertas_umbral"])
+router = APIRouter(prefix="/alertas_umbral", tags=["Alertas"])
 
 async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
     """
@@ -174,18 +174,35 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
 
 
 # Ruta GET para obtener alertas con filtro de días configurable
-@router.get("/todas_alertas")
+@router.get(
+    "/todas_alertas",
+    summary="Obtener todas las alertas de ambas bombas",
+    description="""
+Consulta las alertas generadas por el sistema de detección de anomalías para ambas bombas (A y B).
+
+**Sistema de Alertas:**
+Las alertas se generan automáticamente cuando se detectan múltiples anomalías en un sensor dentro de una ventana de 8 horas:
+- **AVISO**: 3+ anomalías en 8 horas
+- **ALERTA**: 8+ anomalías en 8 horas
+- **CRÍTICA**: 15+ anomalías en 8 horas
+
+**Parámetros:**
+- `dias`: Número de días hacia atrás para filtrar (1-90, default: 2)
+
+**Respuesta:**
+Lista de alertas ordenadas por timestamp (más recientes primero), incluyendo:
+- ID de la alerta
+- Tipo de sensor afectado
+- Descripción y nivel de severidad
+- Timestamps del período anómalo
+- Origen (Bomba A o B)
+    """,
+    response_description="Lista de alertas de ambas bombas"
+)
 async def get_todas_alertas(
     dias: int = Query(default=2, ge=1, le=90, description="Número de días hacia atrás para filtrar alertas (1-90)"),
     db: Session = Depends(get_db)
 ):
-    """
-    Obtiene todas las alertas de ambas bombas filtradas por rango de tiempo.
-
-    Parámetros:
-    - dias: Número de días hacia atrás (1-30). Por defecto 2 días.
-      Ejemplos: 1 (último día), 2 (últimos 2 días), 7 (última semana), 30 (último mes)
-    """
     try:
         alertas = await _get_and_classify_bitacoras(db, dias=dias)
 
@@ -242,20 +259,33 @@ def _obtener_datos_sensor(db: Session, modelo_sensor, timestamp_inicio, timestam
     return registros
 
 
-@router.get("/{alerta_id}/datos_anomalia")
+@router.get(
+    "/{alerta_id}/datos_anomalia",
+    summary="Obtener datos del sensor durante la anomalía",
+    description="""
+Recupera los registros del sensor correspondiente durante el período exacto de la anomalía que generó la alerta.
+
+**Uso principal:**
+Permite recrear el gráfico del comportamiento del sensor durante el evento anómalo, mostrando exactamente qué valores causaron la alerta.
+
+**Parámetros:**
+- `alerta_id`: ID de la alerta a consultar
+- `bomba`: 'A' o 'B' para especificar la bomba (recomendado si hay IDs duplicados)
+
+**Respuesta incluye:**
+- Período anómalo (inicio, fin, duración en minutos)
+- Estadísticas (total registros, % anomalías)
+- Lista de datos con valor, clasificación y timestamp de cada registro
+
+**Nota:** Solo funciona para alertas que tienen timestamps de anomalía registrados.
+    """,
+    response_description="Datos del sensor durante el período anómalo"
+)
 async def get_datos_anomalia(
     alerta_id: int,
     bomba: Optional[str] = Query(None, description="Bomba específica: 'A' o 'B'. Si no se especifica, busca en ambas."),
     db: Session = Depends(get_db)
 ):
-    """
-    Obtiene los datos del sensor durante el periodo de anomalia de una alerta especifica.
-    Permite recrear el grafico del momento exacto de la anomalia.
-
-    Parámetros:
-    - alerta_id: ID de la alerta
-    - bomba: 'A' o 'B' para especificar la bomba (recomendado para evitar colisiones de ID)
-    """
     try:
         # Buscar la alerta (con bomba específica si se proporciona)
         alerta, bomba_encontrada, mapeo_sensores = _buscar_alerta(db, alerta_id, bomba)
@@ -330,7 +360,32 @@ async def get_datos_anomalia(
         raise HTTPException(status_code=500, detail=f"Error al obtener datos de anomalia: {str(e)}")
 
 
-@router.get("/{alerta_id}/datos_anomalia_contexto")
+@router.get(
+    "/{alerta_id}/datos_anomalia_contexto",
+    summary="Obtener datos de anomalía con contexto temporal",
+    description="""
+Recupera los registros del sensor durante la anomalía **más** un contexto temporal extendido antes y después del evento.
+
+**Ventaja sobre `/datos_anomalia`:**
+Permite visualizar el comportamiento del sensor ANTES de la anomalía (para identificar patrones previos) y DESPUÉS (para ver la recuperación).
+
+**Parámetros:**
+- `alerta_id`: ID de la alerta a consultar
+- `minutos_antes`: Minutos de contexto previo (0-120, default: 30)
+- `minutos_despues`: Minutos de contexto posterior (0-120, default: 30)
+- `bomba`: 'A' o 'B' para especificar la bomba
+
+**Respuesta incluye:**
+- Período anómalo original
+- Período de consulta extendido
+- Datos del sensor con indicador `en_periodo_anomalo` para distinguir registros dentro/fuera del evento
+- Estadísticas completas
+
+**Ejemplo de uso:**
+Con `minutos_antes=60` y `minutos_despues=30`, se obtienen datos desde 1 hora antes hasta 30 minutos después del período anómalo.
+    """,
+    response_description="Datos del sensor con contexto temporal extendido"
+)
 async def get_datos_anomalia_contexto(
     alerta_id: int,
     minutos_antes: int = Query(default=30, ge=0, le=120, description="Minutos de contexto antes del periodo anomalo"),
@@ -338,17 +393,6 @@ async def get_datos_anomalia_contexto(
     bomba: Optional[str] = Query(None, description="Bomba específica: 'A' o 'B'. Si no se especifica, busca en ambas."),
     db: Session = Depends(get_db)
 ):
-    """
-    Obtiene los datos del sensor con contexto temporal extendido.
-    Incluye datos ANTES y DESPUES del periodo anomalo para visualizar
-    el comportamiento previo y la recuperacion del sensor.
-
-    Parámetros:
-    - alerta_id: ID de la alerta
-    - minutos_antes: Contexto previo al periodo anómalo (0-120)
-    - minutos_despues: Contexto posterior al periodo anómalo (0-120)
-    - bomba: 'A' o 'B' para especificar la bomba (recomendado para evitar colisiones de ID)
-    """
     try:
         # Buscar la alerta (con bomba específica si se proporciona)
         alerta, bomba_encontrada, mapeo_sensores = _buscar_alerta(db, alerta_id, bomba)

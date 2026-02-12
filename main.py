@@ -1,7 +1,9 @@
 import os
-from fastapi import FastAPI, Depends
+from typing import Optional
+from fastapi import FastAPI, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from dotenv import load_dotenv
 
 from rutas.sensores_router import router as sensores_router
@@ -10,14 +12,17 @@ from rutas.bitacoras_router import router as bitacoras_router
 from rutas.bitacoras_router_b import router as bitacoras_router_b
 from rutas.sensores_router_B import router_b as sensores_router_b
 from modelos.database import engine, Base, SessionLocal
-from auth.dependencies import get_current_user, get_current_user_optional
+from auth.dependencies import get_current_user, get_current_user_optional, get_user_from_docs_auth
 
 load_dotenv()
 
 app = FastAPI(
     title="backend GM",
     description="backend para obtener los valores de los sensores para graficar y predecir",
-    version="1.0"
+    version="1.0",
+    docs_url=None,      # Deshabilitado - se sirve manualmente con autenticacion
+    redoc_url=None,     # Deshabilitado - se sirve manualmente con autenticacion
+    openapi_url=None    # Deshabilitado - se sirve manualmente con autenticacion
 )
 
 # Crear todas las tablas si no existen
@@ -49,6 +54,51 @@ async def redirect_to_docs():
 async def health_check():
     """Endpoint de health check - publico"""
     return {"status": "ok", "message": "Backend GM funcionando correctamente"}
+
+
+# ==========================================
+# DOCUMENTACION PROTEGIDA CON AUTENTICACION
+# ==========================================
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_openapi_schema(request: Request, token: Optional[str] = Query(None)):
+    """OpenAPI schema - requiere autenticacion via cookie, query param o header"""
+    await get_user_from_docs_auth(request, token)
+    return JSONResponse(app.openapi())
+
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui(request: Request, token: Optional[str] = Query(None)):
+    """Swagger UI - requiere autenticacion via cookie, query param o header"""
+    auth = await get_user_from_docs_auth(request, token)
+
+    # Si viene por query param, setear cookie y redirigir (limpiar URL)
+    if token:
+        response = RedirectResponse(url="/docs", status_code=302)
+        response.set_cookie("docs_token", auth["token"], httponly=True, max_age=3600)
+        return response
+
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title=app.title + " - Docs"
+    )
+
+
+@app.get("/redoc", include_in_schema=False)
+async def custom_redoc(request: Request, token: Optional[str] = Query(None)):
+    """ReDoc - requiere autenticacion via cookie, query param o header"""
+    auth = await get_user_from_docs_auth(request, token)
+
+    # Si viene por query param, setear cookie y redirigir (limpiar URL)
+    if token:
+        response = RedirectResponse(url="/redoc", status_code=302)
+        response.set_cookie("docs_token", auth["token"], httponly=True, max_age=3600)
+        return response
+
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title=app.title + " - ReDoc"
+    )
 
 
 # ==========================================

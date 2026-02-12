@@ -15,7 +15,7 @@ from modelos.modelos import (SensorCorriente, SensorSalidaAgua, SensorPresionAgu
                           SensorFlujoAguaRecalentador, SensorFlujoAguaVaporAlta, SensorPosicionValvulaRecirc,
                           SensorPresionAguaMP, SensorPresionSuccionBAA, SensorTemperaturaEstator, SensorFlujoSalida12FPMFC)
 
-router = APIRouter(prefix="/sensores", tags=["Sensores"])
+router = APIRouter(prefix="/sensores", tags=["Sensores Bomba A"])
 
 
 # Datos por defecto
@@ -1109,21 +1109,33 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
 
 # ————— Rutas Post —————
 
-@router.post("/predecir-bomba", response_model=PrediccionBombaOutput)
+@router.post(
+    "/predecir-bomba",
+    response_model=PrediccionBombaOutput,
+    summary="Prediccion global de falla - Bomba A",
+    description="""
+Realiza una prediccion de probabilidad de falla utilizando el modelo **Random Forest** entrenado para la Bomba A.
+
+## Parametros de entrada
+El modelo requiere **20 variables** de sensores:
+- Presion de agua, voltaje de barra, corriente del motor
+- Vibraciones, temperaturas (motor, bomba, empuje, ambiental)
+- Flujos de agua (domo AP/MP, recalentador, vapor alta)
+- Excentricidad, posicion de valvula, MW brutos de gas
+
+## Respuesta
+- `prediccion`: Porcentaje de probabilidad de falla (0-100%)
+- `status`: Estado de la operacion ("success")
+
+## Almacenamiento
+Cada prediccion se guarda en la base de datos con fecha y hora de ejecucion.
+    """,
+    response_description="Porcentaje de probabilidad de falla y estado de la operacion"
+)
 async def predecir_bomba(
     datos: PrediccionBombaInput,
     db: Session = Depends(get_db)
 ):
-    """
-    Realiza una predicción utilizando el modelo Random Forest para la bomba.
-    
-    Parámetros:
-    - datos: Objeto con los valores de entrada para el modelo
-    
-    Retorna:
-    - prediccion: Valor predicho por el modelo
-    - status: Estado de la operación
-    """
     try:
         # Obtener el modelo usando ModelRegistry en lugar de cargarlo directamente
         logger.info("Obteniendo modelo para predicción de bomba")
@@ -1205,14 +1217,32 @@ async def predecir_bomba(
         )
 
 
-@router.get("/predicciones-bomba-a", response_model=List[PrediccionBombaResponse])
+@router.get(
+    "/predicciones-bomba-a",
+    response_model=List[PrediccionBombaResponse],
+    summary="Historico de predicciones - Bomba A",
+    description="""
+Obtiene el historico de las ultimas predicciones de falla realizadas para la Bomba A.
+
+## Parametros
+- `limite`: Cantidad de registros a devolver (1-100, default: 40)
+
+## Respuesta
+Lista ordenada cronologicamente (mas antiguos primero) con:
+- `id`: Identificador unico de la prediccion
+- `valor_prediccion`: Porcentaje de probabilidad de falla
+- `hora_ejecucion`: Hora en que se realizo la prediccion
+- `dia_ejecucion`: Fecha de la prediccion
+
+## Uso
+Ideal para graficar la evolucion de la probabilidad de falla en el tiempo.
+    """,
+    response_description="Lista de predicciones historicas de la Bomba A"
+)
 async def obtener_predicciones_bomba(
     db: Session = Depends(get_db),
-    limite: int = Query(40, description="Número de registros a devolver (máx 100)", le=100, ge=1)
+    limite: int = Query(40, description="Numero de registros a devolver (max 100)", le=100, ge=1)
 ):
-    """
-    Obtiene las últimas predicciones de la bomba.
-    """
     try:
         # Consulta directa con ordenamiento y límite
         predicciones = db.query(PrediccionBombaA)\
@@ -1228,84 +1258,578 @@ async def obtener_predicciones_bomba(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/prediccion_corriente")
+@router.post(
+    "/prediccion_corriente",
+    summary="Detectar anomalía - Corriente del motor",
+    description="""
+Analiza el valor de corriente eléctrica del motor de la Bomba A para detectar anomalías.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de corriente (Amperios)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_corriente(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="corriente_motor", umbral_key="prediccion_corriente", model_class=SensorCorriente)
 
-@router.post("/prediccion_salida-agua")
+@router.post(
+    "/prediccion_salida-agua",
+    summary="Detectar anomalía - Salida de agua",
+    description="""
+Analiza el flujo/temperatura de salida de agua de la Bomba A para detectar anomalías en el caudal de descarga.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico del sensor de salida de agua
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_salida(sensor: SensorInput, db: Session = Depends(get_db)):
-    return procesar(sensor, db, modelo_key="salida_bomba",    umbral_key="prediccion_salida-agua",    model_class=SensorSalidaAgua)
+    return procesar(sensor, db, modelo_key="salida_bomba", umbral_key="prediccion_salida-agua", model_class=SensorSalidaAgua)
 
-@router.post("/prediccion_presion-agua")
+@router.post(
+    "/prediccion_presion-agua",
+    summary="Detectar anomalía - Presión de agua AP",
+    description="""
+Analiza la presión de agua de alimentación en el economizador de alta presión de la Bomba A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de presión (PSI o Bar)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Valores anormales pueden indicar problemas en el sistema hidráulico, obstrucciones o fugas.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_presion(sensor: SensorInput, db: Session = Depends(get_db)):
-    return procesar(sensor, db, modelo_key="presion_agua",    umbral_key="prediccion_presion-agua", model_class=SensorPresionAgua)
+    return procesar(sensor, db, modelo_key="presion_agua", umbral_key="prediccion_presion-agua", model_class=SensorPresionAgua)
 
-@router.post("/prediccion_mw-brutos-gas")
+@router.post(
+    "/prediccion_mw-brutos-gas",
+    summary="Detectar anomalía - MW brutos generación gas",
+    description="""
+Analiza la generación de potencia bruta por consumo de gas para detectar ineficiencias energéticas.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de MW brutos generados
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Anomalías pueden indicar problemas en la conversión energética o ineficiencias en la combustión.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_mw_gas(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="mw_brutos_gas", umbral_key="prediccion_mw-brutos-gas", model_class=SensorMw_brutos_generacion_gas)
 
-@router.post("/prediccion_temperatura-ambiental")
+@router.post(
+    "/prediccion_temperatura-ambiental",
+    summary="Detectar anomalía - Temperatura ambiental",
+    description="""
+Analiza la temperatura ambiente en la zona de operación de la Bomba A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de temperatura (°C)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Valores extremos pueden afectar el rendimiento de los equipos y la refrigeración.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_temperatura_ambiental(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temperatura_ambiental", umbral_key="prediccion_temperatura-ambiental", model_class=SensorTemperatura_Ambiental)
 
-@router.post("/prediccion_temp-descanso-bomba-1a")
+@router.post(
+    "/prediccion_temp-descanso-bomba-1a",
+    summary="Detectar anomalía - Temp. descanso bomba",
+    description="""
+Analiza la temperatura en los rodamientos/descansos internos de la Bomba 1A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de temperatura (°C)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Temperaturas elevadas indican posible desgaste en rodamientos o falta de lubricación.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_temp_descanso(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temp_descanso_bomba_1a", umbral_key="prediccion_temp-descanso-bomba-1a", model_class=SensorTemperatura_descanso_interno_bomba_1a)
 
-@router.post("/prediccion_temp-empuje-bomba-1a")
+@router.post(
+    "/prediccion_temp-empuje-bomba-1a",
+    summary="Detectar anomalía - Temp. empuje bomba",
+    description="""
+Analiza la temperatura en el cojinete de empuje de la Bomba 1A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de temperatura (°C)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Temperaturas anormales pueden indicar problemas de carga axial o fallas en el sistema de refrigeración.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_temp_empuje(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temp_descanso_empuje_bomba_1a", umbral_key="prediccion_temp-empuje-bomba-1a", model_class=SensorTemperatura_descanso_interna_empuje_bomba_1aa)
 
-@router.post("/prediccion_temp-motor-bomba-1a")
+@router.post(
+    "/prediccion_temp-motor-bomba-1a",
+    summary="Detectar anomalía - Temp. motor bomba",
+    description="""
+Analiza la temperatura de operación del motor de la Bomba 1A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de temperatura (°C)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Sobrecalentamiento puede indicar sobrecarga del motor o falla en el sistema de ventilación.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_temp_motor(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temp_descanso_motor_bomba_1a", umbral_key="prediccion_temp-motor-bomba-1a", model_class=SensorTemperatura_descanso_interna_motor_bomba_1a)
 
-@router.post("/prediccion_vibracion-axial")
+@router.post(
+    "/prediccion_vibracion-axial",
+    summary="Detectar anomalía - Vibración axial",
+    description="""
+Analiza el nivel de vibración axial en el descanso de empuje de la Bomba A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de vibración (mm/s o g)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Vibraciones excesivas indican posible desbalanceo, desalineación o desgaste en componentes rotativos.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_vibracion(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_axial_empuje", umbral_key="prediccion_vibracion-axial", model_class=SensorVibracion_axial_descanso)
 
-@router.post("/prediccion_voltaje-barra")
+@router.post(
+    "/prediccion_voltaje-barra",
+    summary="Detectar anomalía - Voltaje barra 6.6KV",
+    description="""
+Analiza el nivel de voltaje en las barras de distribución de 6.6KV.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de voltaje (KV)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Fluctuaciones de voltaje pueden dañar equipos eléctricos sensibles y afectar la operación de motores.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_voltaje(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="voltaje_barra", umbral_key="prediccion_voltaje-barra", model_class=SensorVoltaje_barra)
 
 # Rutas POST para los nuevos sensores
-@router.post("/prediccion_excentricidad-bomba")
+@router.post(
+    "/prediccion_excentricidad-bomba",
+    summary="Detectar anomalía - Excentricidad bomba",
+    description="""
+Analiza la excentricidad del rotor de la Bomba 1A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de excentricidad (mm o mils)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Valores elevados de excentricidad indican posible desalineación, desgaste en cojinetes o problemas en el eje.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_excentricidad_bomba(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="excentricidad_bomba", umbral_key="prediccion_excentricidad-bomba", model_class=SensorExcentricidadBomba)
 
-@router.post("/prediccion_flujo-agua-domo-ap")
+@router.post(
+    "/prediccion_flujo-agua-domo-ap",
+    summary="Detectar anomalía - Flujo agua domo AP",
+    description="""
+Analiza el flujo de agua de alimentación al domo de alta presión del HRSG.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de flujo (m³/h o GPM)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Variaciones en el flujo pueden afectar la generación de vapor y el balance térmico del sistema.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_flujo_agua_domo_ap(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_domo_ap", umbral_key="prediccion_flujo-agua-domo-ap", model_class=SensorFlujoAguaDomoAP)
 
-@router.post("/prediccion_flujo-agua-domo-mp")
+@router.post(
+    "/prediccion_flujo-agua-domo-mp",
+    summary="Detectar anomalía - Flujo agua domo MP",
+    description="""
+Analiza el flujo de agua de alimentación al domo de media presión del HRSG.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de flujo (m³/h o GPM)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Este flujo es esencial para el balance térmico del HRSG. Anomalías pueden afectar la eficiencia del ciclo combinado.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_flujo_agua_domo_mp(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_domo_mp", umbral_key="prediccion_flujo-agua-domo-mp", model_class=SensorFlujoAguaDomoMP)
 
-@router.post("/prediccion_flujo-agua-recalentador")
+@router.post(
+    "/prediccion_flujo-agua-recalentador",
+    summary="Detectar anomalía - Flujo agua recalentador",
+    description="""
+Analiza el flujo de agua para atemperación del recalentador.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de flujo (m³/h o GPM)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Este flujo controla la temperatura del vapor recalentado. Anomalías pueden causar daños térmicos a la turbina.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_flujo_agua_recalentador(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_recalentador", umbral_key="prediccion_flujo-agua-recalentador", model_class=SensorFlujoAguaRecalentador)
 
-@router.post("/prediccion_flujo-agua-vapor-alta")
+@router.post(
+    "/prediccion_flujo-agua-vapor-alta",
+    summary="Detectar anomalía - Flujo agua vapor alta",
+    description="""
+Analiza el flujo de agua para atemperación de vapor de alta presión.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de flujo (m³/h o GPM)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Este flujo protege la turbina de temperaturas excesivas. Anomalías pueden causar daños severos al equipo.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_flujo_agua_vapor_alta(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_vapor_alta", umbral_key="prediccion_flujo-agua-vapor-alta", model_class=SensorFlujoAguaVaporAlta)
 
-@router.post("/prediccion_posicion-valvula-recirc")
+@router.post(
+    "/prediccion_posicion-valvula-recirc",
+    summary="Detectar anomalía - Posición válvula recirculación",
+    description="""
+Analiza la posición de la válvula de recirculación de la Bomba A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de posición (% apertura)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Posiciones anómalas de la válvula pueden causar cavitación en la bomba y daño a los impulsores.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_posicion_valvula_recirc(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="posicion_valvula_recirc", umbral_key="prediccion_posicion-valvula-recirc", model_class=SensorPosicionValvulaRecirc)
 
-@router.post("/prediccion_presion-agua-mp")
+@router.post(
+    "/prediccion_presion-agua-mp",
+    summary="Detectar anomalía - Presión agua MP",
+    description="""
+Analiza la presión de agua de alimentación en el economizador de media presión.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de presión (PSI o Bar)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Anomalías pueden indicar restricciones en el sistema, fugas o problemas con la bomba.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_presion_agua_mp(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="presion_agua_mp", umbral_key="prediccion_presion-agua-mp", model_class=SensorPresionAguaMP)
 
-@router.post("/prediccion_presion-succion-baa")
+@router.post(
+    "/prediccion_presion-succion-baa",
+    summary="Detectar anomalía - Presión succión BAA",
+    description="""
+Analiza la presión en la succión de la bomba de agua de alimentación.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de presión (PSI o Bar)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Baja presión de succión puede causar cavitación severa, daño a los impulsores y falla de la bomba.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_presion_succion_baa(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="presion_succion_baa", umbral_key="prediccion_presion-succion-baa", model_class=SensorPresionSuccionBAA)
 
-@router.post("/prediccion_temperatura-estator")
+@router.post(
+    "/prediccion_temperatura-estator",
+    summary="Detectar anomalía - Temperatura estator",
+    description="""
+Analiza la temperatura del estator del motor de la Bomba A.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de temperatura (°C)
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Sobrecalentamiento del estator indica posibles problemas de aislamiento, sobrecarga o falla en el sistema de refrigeración.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_temperatura_estator(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temperatura_estator", umbral_key="prediccion_temperatura-estator", model_class=SensorTemperaturaEstator)
 
-@router.post("/prediccion_flujo-salida-12fpmfc")
+@router.post(
+    "/prediccion_flujo-salida-12fpmfc",
+    summary="Detectar anomalía - Flujo salida 12FPMFC",
+    description="""
+Analiza el flujo de salida medido por el sensor 12FPMFC.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de flujo
+
+**Sistema de alertas:**
+Se evalúan las anomalías en una ventana de 8 horas:
+- **AVISO**: 3+ anomalías
+- **ALERTA**: 8+ anomalías
+- **CRÍTICA**: 15+ anomalías
+
+**Indicadores de falla:**
+Variaciones significativas indican cambios en la operación del sistema que pueden requerir atención.
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
 async def predecir_flujo_salida_12fpmfc(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_salida_12fpmfc", umbral_key="prediccion_flujo-salida-12fpmfc", model_class=SensorFlujoSalida12FPMFC)
 
@@ -1372,184 +1896,547 @@ async def _get_and_classify(
         })
     return salida
 
-# Rutas
-@router.get("/corriente")
+# Rutas GET para consulta de datos historicos
+@router.get(
+    "/corriente",
+    summary="Histórico - Corriente del motor",
+    description="""
+Obtiene registros históricos del sensor de corriente eléctrica del motor de la Bomba A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio del rango (ISO 8601: YYYY-MM-DDTHH:MM:SS)
+- `termino`: Fecha/hora de fin del rango (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando el modelo Isolation Forest.
+
+**Respuesta:**
+Lista de registros con:
+- `valor_sensor`: Valor de corriente medido
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `tiempo_ejecucion`: Timestamp del registro
+    """,
+    response_description="Lista de registros históricos del sensor de corriente"
+)
 async def get_sensores_corriente(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601): YYYY-MM-DDTHH:MM:SS"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601): YYYY-MM-DDTHH:MM:SS"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorCorriente, "corriente_motor", DEFAULT_SENSORES_CORRIENTE, inicio, termino, limite)
 
-@router.get("/salida-agua")
+@router.get(
+    "/salida-agua",
+    summary="Histórico - Salida de agua",
+    description="""
+Obtiene registros históricos del sensor de salida de agua de la Bomba A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos del sensor de salida de agua"
+)
 async def get_sensores_salida_agua(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorSalidaAgua, "salida_bomba", DEFAULT_SENSORES_SALIDA_AGUA, inicio, termino, limite)
 
-@router.get("/presion-agua")
+@router.get(
+    "/presion-agua",
+    summary="Histórico - Presión de agua AP",
+    description="""
+Obtiene registros históricos del sensor de presión de agua de alta presión de la Bomba A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos del sensor de presión"
+)
 async def get_sensores_presion_agua(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorPresionAgua, "presion_agua", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/generacion-gas")
+@router.get(
+    "/generacion-gas",
+    summary="Histórico - MW brutos gas",
+    description="""
+Obtiene registros históricos del sensor de generación de potencia bruta por consumo de gas.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de generación de MW"
+)
 async def get_sensores_generacion_gas(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorMw_brutos_generacion_gas, "mw_brutos_gas", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/temperatura-ambiental")
+@router.get(
+    "/temperatura-ambiental",
+    summary="Histórico - Temperatura ambiental",
+    description="""
+Obtiene registros históricos del sensor de temperatura ambiente en la zona de la Bomba A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de temperatura ambiental"
+)
 async def get_sensores_temperatura_ambiental(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorTemperatura_Ambiental, "temperatura_ambiental", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/temperatura-interna-empuje")
+@router.get(
+    "/temperatura-interna-empuje",
+    summary="Histórico - Temp. empuje bomba",
+    description="""
+Obtiene registros históricos del sensor de temperatura del cojinete de empuje de la Bomba 1A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de temperatura del empuje"
+)
 async def get_sensores_temp_interna_empuje(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorTemperatura_descanso_interna_empuje_bomba_1aa, "temp_descanso_empuje_bomba_1a", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/temperatura-descanso-motor")
+@router.get(
+    "/temperatura-descanso-motor",
+    summary="Histórico - Temp. motor bomba",
+    description="""
+Obtiene registros históricos del sensor de temperatura del motor de la Bomba 1A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de temperatura del motor"
+)
 async def get_sensores_temp_descanso_motor(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorTemperatura_descanso_interna_motor_bomba_1a, "temp_descanso_motor_bomba_1a", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/temperatura-descanso-bomba")
+@router.get(
+    "/temperatura-descanso-bomba",
+    summary="Histórico - Temp. descanso bomba",
+    description="""
+Obtiene registros históricos del sensor de temperatura de los rodamientos/descansos de la Bomba 1A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de temperatura del descanso"
+)
 async def get_sensores_temp_descanso_bomba(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorTemperatura_descanso_interno_bomba_1a, "temp_descanso_bomba_1a", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/vibracion-axial")
+@router.get(
+    "/vibracion-axial",
+    summary="Histórico - Vibración axial",
+    description="""
+Obtiene registros históricos del sensor de vibración axial del descanso de empuje de la Bomba A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de vibración axial"
+)
 async def get_sensores_vibracion_axial(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorVibracion_axial_descanso, "vibracion_axial_empuje", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/voltaje-barra")
+@router.get(
+    "/voltaje-barra",
+    summary="Histórico - Voltaje barra 6.6KV",
+    description="""
+Obtiene registros históricos del sensor de voltaje de las barras de distribución 6.6KV.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de voltaje"
+)
 async def get_sensores_voltaje_barra(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorVoltaje_barra, "voltaje_barra", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
 # Rutas GET para los nuevos sensores
-@router.get("/excentricidad-bomba")
+@router.get(
+    "/excentricidad-bomba",
+    summary="Histórico - Excentricidad bomba",
+    description="""
+Obtiene registros históricos del sensor de excentricidad del rotor de la Bomba 1A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de excentricidad"
+)
 async def get_sensores_excentricidad_bomba(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorExcentricidadBomba, "excentricidad_bomba", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/flujo-agua-domo-ap")
+@router.get(
+    "/flujo-agua-domo-ap",
+    summary="Histórico - Flujo agua domo AP",
+    description="""
+Obtiene registros históricos del flujo de agua al domo de alta presión del HRSG.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de flujo domo AP"
+)
 async def get_sensores_flujo_agua_domo_ap(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorFlujoAguaDomoAP, "flujo_agua_domo_ap", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/flujo-agua-domo-mp")
+@router.get(
+    "/flujo-agua-domo-mp",
+    summary="Histórico - Flujo agua domo MP",
+    description="""
+Obtiene registros históricos del flujo de agua al domo de media presión del HRSG.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de flujo domo MP"
+)
 async def get_sensores_flujo_agua_domo_mp(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorFlujoAguaDomoMP, "flujo_agua_domo_mp", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/flujo-agua-recalentador")
+@router.get(
+    "/flujo-agua-recalentador",
+    summary="Histórico - Flujo agua recalentador",
+    description="""
+Obtiene registros históricos del flujo de agua de atemperación del recalentador.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de flujo recalentador"
+)
 async def get_sensores_flujo_agua_recalentador(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorFlujoAguaRecalentador, "flujo_agua_recalentador", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/flujo-agua-vapor-alta")
+@router.get(
+    "/flujo-agua-vapor-alta",
+    summary="Histórico - Flujo agua vapor alta",
+    description="""
+Obtiene registros históricos del flujo de agua de atemperación de vapor de alta presión.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de flujo vapor alta"
+)
 async def get_sensores_flujo_agua_vapor_alta(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorFlujoAguaVaporAlta, "flujo_agua_vapor_alta", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/posicion-valvula-recirc")
+@router.get(
+    "/posicion-valvula-recirc",
+    summary="Histórico - Posición válvula recirculación",
+    description="""
+Obtiene registros históricos de la posición de la válvula de recirculación de la Bomba A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de posición de válvula"
+)
 async def get_sensores_posicion_valvula_recirc(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorPosicionValvulaRecirc, "posicion_valvula_recirc", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/presion-agua-mp")
+@router.get(
+    "/presion-agua-mp",
+    summary="Histórico - Presión agua MP",
+    description="""
+Obtiene registros históricos del sensor de presión de agua de media presión.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de presión MP"
+)
 async def get_sensores_presion_agua_mp(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorPresionAguaMP, "presion_agua_mp", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/presion-succion-baa")
+@router.get(
+    "/presion-succion-baa",
+    summary="Histórico - Presión succión BAA",
+    description="""
+Obtiene registros históricos del sensor de presión en la succión de la bomba de agua de alimentación.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de presión succión"
+)
 async def get_sensores_presion_succion_baa(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorPresionSuccionBAA, "presion_succion_baa", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/temperatura-estator")
+@router.get(
+    "/temperatura-estator",
+    summary="Histórico - Temperatura estator",
+    description="""
+Obtiene registros históricos del sensor de temperatura del estator del motor de la Bomba A.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de temperatura estator"
+)
 async def get_sensores_temperatura_estator(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorTemperaturaEstator, "temperatura_estator", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
-@router.get("/flujo-salida-12fpmfc")
+@router.get(
+    "/flujo-salida-12fpmfc",
+    summary="Histórico - Flujo salida 12FPMFC",
+    description="""
+Obtiene registros históricos del medidor de flujo 12FPMFC.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Clasificación automática:**
+Los registros sin clasificación se clasifican automáticamente usando ML.
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de flujo 12FPMFC"
+)
 async def get_sensores_flujo_salida_12fpmfc(
-    inicio: Optional[str] = Query(None),
-    termino: Optional[str] = Query(None),
-    limite: int = Query(40, description="Cantidad de registros", ge=10, le=500),
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
     return await _get_and_classify(db, SensorFlujoSalida12FPMFC, "flujo_salida_12fpmfc", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
@@ -1579,11 +2466,39 @@ def _get_range(db: Session, model):
     }
 
 
-@router.get("/corriente/rango")
+@router.get(
+    "/corriente/rango",
+    summary="Rango de fechas - Corriente",
+    description="""
+Obtiene la fecha mínima y máxima de los datos disponibles del sensor de corriente.
+
+**Uso:**
+Útil para configurar filtros de fecha en consultas históricas y conocer el rango temporal de datos disponibles.
+
+**Respuesta:**
+- `inicio`: Timestamp del primer registro disponible
+- `termino`: Timestamp del último registro disponible
+    """,
+    response_description="Rango de fechas disponibles"
+)
 async def rango_corriente(db: Session = Depends(get_db)):
     return _get_range(db, SensorCorriente)
 
-@router.get("/salida-agua/rango")
+@router.get(
+    "/salida-agua/rango",
+    summary="Rango de fechas - Salida agua",
+    description="""
+Obtiene la fecha mínima y máxima de los datos disponibles del sensor de salida de agua.
+
+**Uso:**
+Útil para configurar filtros de fecha en consultas históricas.
+
+**Respuesta:**
+- `inicio`: Timestamp del primer registro disponible
+- `termino`: Timestamp del último registro disponible
+    """,
+    response_description="Rango de fechas disponibles"
+)
 async def rango_salida_agua(db: Session = Depends(get_db)):
     return _get_range(db, SensorSalidaAgua)
 

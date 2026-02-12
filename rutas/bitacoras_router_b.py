@@ -7,7 +7,7 @@ from langchain_llm.analisis import llm_chain, llm_chain_2
 from utils.traduccion_bitacoras import verificar_y_traducir_bitacora
 import asyncio
 
-router = APIRouter(prefix="/bitacoras_b", tags=["bitacoras_b"])
+router = APIRouter(prefix="/bitacoras_b", tags=["Bitácoras Bomba B"])
 
 async def _get_and_classify_bitacoras(db: Session):
     """
@@ -57,7 +57,33 @@ async def _get_and_classify_bitacoras(db: Session):
     return bitacoras
 
 # Ruta para análisis puntual (POST original)
-@router.post("/analisis")
+@router.post(
+    "/analisis",
+    summary="Analizar bitácora con IA - Bomba B",
+    description="""
+Analiza el contenido de una bitácora de la Bomba B utilizando un modelo de lenguaje (LLM) de IBM WatsonX.
+
+**Proceso de análisis:**
+1. El texto de la bitácora se envía al modelo LLM para clasificación
+2. Si se detecta "HRSG Pump Failures", se ejecuta un segundo análisis más detallado
+3. La clasificación se guarda en la base de datos
+4. El texto se traduce automáticamente al español si está en inglés
+
+**Entrada requerida:**
+- `id_bitacora`: ID de la bitácora existente en la base de datos
+- `bitacora`: Texto de la bitácora a analizar
+
+**Clasificaciones posibles:**
+- Fallas de Bomba HRSG (con análisis detallado adicional)
+- Sin Fallas de Bomba HRSG (operación normal)
+- Fallas No Relacionadas con Bomba HRSG
+
+**Respuesta:**
+- `primer resultado`: Clasificación principal
+- `segundo resultado`: Análisis detallado (solo si se detectó falla HRSG)
+    """,
+    response_description="Resultado del análisis LLM"
+)
 async def predecir_corriente(bitacora: BitacoraInput, db: Session = Depends(get_db)):
     try:
         primer_analisis = llm_chain.invoke({"bitacora": bitacora.bitacora}).strip()
@@ -102,7 +128,27 @@ async def predecir_corriente(bitacora: BitacoraInput, db: Session = Depends(get_
         raise HTTPException(status_code=500, detail=str(e))
 
 # Ruta GET todas con clasificación automática
-@router.get("/todas")
+@router.get(
+    "/todas",
+    summary="Obtener todas las bitácoras - Bomba B",
+    description="""
+Obtiene las últimas 40 bitácoras de la Bomba B con clasificación automática.
+
+**Proceso automático:**
+- Las bitácoras sin clasificación se analizan automáticamente con el modelo LLM
+- Los textos en inglés se traducen automáticamente al español
+- Las clasificaciones se guardan para consultas futuras
+
+**Información retornada por bitácora:**
+- ID y texto de la bitácora
+- Clasificación (Fallas HRSG, Sin Fallas, etc.)
+- Alerta/aviso adicional (si aplica)
+- Timestamps
+
+**Nota:** El análisis automático puede tardar si hay muchas bitácoras sin clasificar.
+    """,
+    response_description="Lista de las últimas 40 bitácoras clasificadas"
+)
 async def get_todas_bitacoras(db: Session = Depends(get_db)):
     try:
         bitacoras = await _get_and_classify_bitacoras(db)
@@ -112,7 +158,27 @@ async def get_todas_bitacoras(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Error al conectar con la base de datos.")
 
 # Ruta GET filtrando solo fallas
-@router.get("/todas_fallas")
+@router.get(
+    "/todas_fallas",
+    summary="Obtener bitácoras con fallas HRSG - Bomba B",
+    description="""
+Obtiene las bitácoras de la Bomba B que han sido clasificadas como "HRSG Pump Failures" (Fallas de Bomba HRSG).
+
+**Filtro aplicado:**
+Solo retorna bitácoras cuya clasificación contiene:
+- "HRSG Pump Failures" (en inglés)
+- "Fallas de Bomba HRSG" o "Fallas de Bombas HRSG" (en español)
+
+**Proceso:**
+1. Obtiene las últimas 40 bitácoras (con clasificación automática si es necesario)
+2. Filtra solo las que contienen fallas de bomba HRSG
+3. Retorna la lista filtrada
+
+**Uso típico:**
+Para identificar rápidamente eventos críticos que afectaron las bombas HRSG.
+    """,
+    response_description="Lista de bitácoras con fallas de bomba HRSG"
+)
 async def get_todas_bitacoras_fallas(db: Session = Depends(get_db)):
     try:
         bitacoras = await _get_and_classify_bitacoras(db)
