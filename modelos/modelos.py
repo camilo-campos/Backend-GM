@@ -258,3 +258,29 @@ class SensorFlujoSalida12FPMFC(Base):
     valor_sensor = Column(Float)  # Valor del sensor
     clasificacion = Column(Integer, nullable=True)  # Permitir valores nulos
     contador_anomalias = Column(Integer, default=0)
+
+# ============================================
+# MODELOS NUEVOS AGREGADOS - 2025-02-17
+# ============================================
+
+# Bomba A - Nuevos modelos
+class SensorVibracionXDescansoExterno(Base):
+    __tablename__ = 'vibracion_x_descanso_externo'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorVibracionYDescansoExterno(Base):
+    __tablename__ = 'vibracion_y_descanso_externo'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)

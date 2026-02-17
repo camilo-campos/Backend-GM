@@ -100,6 +100,12 @@ MODEL_PATHS = {
     "presion_succion_baa": "Presion_succion_BAA_AE01A.pkl",
     "temperatura_estator": "Temperatura_Estator_MTR_BBA_AA_1A_A.pkl",
     "flujo_salida_12fpmfc": "12FPMFC.1B.OUT.pkl",
+
+    # Modelos nuevos agregados
+    "temperatura_estator_b": "Temperatura_Estator_MTR_BBA_AA_1A_B.pkl",
+    "temperatura_estator_c": "Temperatura_Estator_MTR_BBA_AA_1A_C.pkl",
+    "vibracion_x_descanso_externo": "Vibracion_X_Descanso_Externo_Bomba_1A_A.pkl",
+    "vibracion_y_descanso_externo": "Vibracion_Y_Descanso_Externo_Bomba_1A_B.pkl",
 }
 
 class ModelRegistry:
@@ -2502,3 +2508,137 @@ Obtiene la fecha mínima y máxima de los datos disponibles del sensor de salida
 async def rango_salida_agua(db: Session = Depends(get_db)):
     return _get_range(db, SensorSalidaAgua)
 
+
+
+# ============================================
+# ENDPOINTS NUEVOS AGREGADOS - 2025-02-17
+# ============================================
+
+# Importar nuevos modelos
+from modelos.modelos import SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno
+from modelos_b.modelos_b import SensorTemperaturaEstator as SensorTemperaturaEstatorB
+
+@router.get(
+    "/temperatura-estator-b",
+    summary="Historico - Temperatura estator fase B",
+    description="""
+Obtiene registros historicos del sensor de temperatura del estator del motor de la Bomba A - Fase B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de temperatura estator fase B"
+)
+async def get_sensores_temperatura_estator_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaEstatorB, "temperatura_estator_b", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_temperatura-estator-b",
+    summary="Detectar anomalia - Temperatura estator fase B",
+    description="""
+Analiza la temperatura del estator del motor de la Bomba A - Fase B.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temperatura_estator_b(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temperatura_estator_b", umbral_key="prediccion_temperatura-estator-b", model_class=SensorTemperaturaEstatorB)
+
+
+@router.get(
+    "/vibracion-x-externo",
+    summary="Historico - Vibracion X descanso externo",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje X del descanso externo de la Bomba A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de vibracion X externo"
+)
+async def get_sensores_vibracion_x_externo(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorVibracionXDescansoExterno, "vibracion_x_descanso_externo", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_vibracion-x-externo",
+    summary="Detectar anomalia - Vibracion X descanso externo",
+    description="""
+Analiza la vibracion en eje X del descanso externo de la Bomba A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de vibracion (um)
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_vibracion_x_externo(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="vibracion_x_descanso_externo", umbral_key="prediccion_vibracion-x-externo", model_class=SensorVibracionXDescansoExterno)
+
+
+@router.get(
+    "/vibracion-y-externo",
+    summary="Historico - Vibracion Y descanso externo",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje Y del descanso externo de la Bomba A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de vibracion Y externo"
+)
+async def get_sensores_vibracion_y_externo(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorVibracionYDescansoExterno, "vibracion_y_descanso_externo", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_vibracion-y-externo",
+    summary="Detectar anomalia - Vibracion Y descanso externo",
+    description="""
+Analiza la vibracion en eje Y del descanso externo de la Bomba A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de vibracion (um)
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_vibracion_y_externo(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="vibracion_y_descanso_externo", umbral_key="prediccion_vibracion-y-externo", model_class=SensorVibracionYDescansoExterno)

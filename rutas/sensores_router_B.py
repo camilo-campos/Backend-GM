@@ -174,6 +174,12 @@ MODEL_PATHS = {
     "vibracion_x_descanso": "Vibraci_n_X_Descanso_Interno_Bomba_1B_B.pkl",
     "vibracion_y_descanso": "Vibraci_n_Y_Descanso_Interno_Bomba_1B_B.pkl",
     "voltaje_barra": "Voltaje_Barra_6_6KV_B.pkl",
+
+    # Modelos nuevos agregados
+    "temp_descanso_bomba": "Temperatura_Descanso_Interno_Bomba_1B_B.pkl",
+    "temp_descanso_empuje": "Temperatura_Descanso_Interno_Empuje_Bomba_1B_A_B.pkl",
+    "temp_descanso_motor": "Temperatura_Descanso_Interno_MTR_Bomba_1B_G_B.pkl",
+    "temperatura_estator_b": "Temperatura_Estator_MTR_BBA_AA_1B_B_B.pkl",
 }
 
 class ModelRegistry:
@@ -2138,3 +2144,166 @@ async def get_sensores_voltaje_barra(
 
 
 
+
+
+# ============================================
+# ENDPOINTS NUEVOS AGREGADOS - 2025-02-17
+# ============================================
+
+# Importar nuevos modelos
+from modelos_b.modelos_b import SensorTemperaturaDescansoInternoBombaB, SensorTemperaturaDescansoInternaEmpujeBombaB, SensorTemperaturaDescansoInternaMotorBombaB, SensorTemperaturaEstator as SensorTemperaturaEstatorB
+
+@router_b.get(
+    "/temp_descanso_bomba",
+    summary="Historico - Temp. descanso interno bomba B",
+    description="""
+Obtiene registros historicos del sensor de temperatura del descanso interno de la Bomba B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de temperatura descanso bomba B"
+)
+async def get_sensores_temp_descanso_bomba_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaDescansoInternoBombaB, "temp_descanso_bomba", DEFAULT_SENSORES, inicio, termino, limite)
+
+
+@router_b.post(
+    "/prediccion_temp_descanso_bomba",
+    summary="Detectar anomalia - Temp. descanso interno bomba B",
+    description="""
+Analiza la temperatura del descanso interno de la Bomba B.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temp_descanso_bomba_b(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temp_descanso_bomba", umbral_key="prediccion_temp_descanso_bomba", model_class=SensorTemperaturaDescansoInternoBombaB)
+
+
+@router_b.get(
+    "/temp_descanso_empuje",
+    summary="Historico - Temp. descanso empuje bomba B",
+    description="""
+Obtiene registros historicos del sensor de temperatura del descanso de empuje de la Bomba B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de temperatura descanso empuje bomba B"
+)
+async def get_sensores_temp_descanso_empuje_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaDescansoInternaEmpujeBombaB, "temp_descanso_empuje", DEFAULT_SENSORES, inicio, termino, limite)
+
+
+@router_b.post(
+    "/prediccion_temp_descanso_empuje",
+    summary="Detectar anomalia - Temp. descanso empuje bomba B",
+    description="""
+Analiza la temperatura del descanso de empuje de la Bomba B.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temp_descanso_empuje_b(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temp_descanso_empuje", umbral_key="prediccion_temp_descanso_empuje", model_class=SensorTemperaturaDescansoInternaEmpujeBombaB)
+
+
+@router_b.get(
+    "/temp_descanso_motor",
+    summary="Historico - Temp. descanso motor bomba B",
+    description="""
+Obtiene registros historicos del sensor de temperatura del descanso del motor de la Bomba B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de temperatura descanso motor bomba B"
+)
+async def get_sensores_temp_descanso_motor_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaDescansoInternaMotorBombaB, "temp_descanso_motor", DEFAULT_SENSORES, inicio, termino, limite)
+
+
+@router_b.post(
+    "/prediccion_temp_descanso_motor",
+    summary="Detectar anomalia - Temp. descanso motor bomba B",
+    description="""
+Analiza la temperatura del descanso del motor de la Bomba B.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temp_descanso_motor_b(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temp_descanso_motor", umbral_key="prediccion_temp_descanso_motor", model_class=SensorTemperaturaDescansoInternaMotorBombaB)
+
+
+@router_b.get(
+    "/temperatura_estator_b",
+    summary="Historico - Temp. estator fase B bomba B",
+    description="""
+Obtiene registros historicos del sensor de temperatura del estator del motor de la Bomba B - Fase B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de temperatura estator fase B bomba B"
+)
+async def get_sensores_temperatura_estator_b_bomba_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaEstatorB, "temperatura_estator_b", DEFAULT_SENSORES, inicio, termino, limite)
+
+
+@router_b.post(
+    "/prediccion_temperatura_estator_b",
+    summary="Detectar anomalia - Temp. estator fase B bomba B",
+    description="""
+Analiza la temperatura del estator del motor de la Bomba B - Fase B.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temperatura_estator_b_bomba_b(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temperatura_estator_b", umbral_key="prediccion_temperatura_estator_b", model_class=SensorTemperaturaEstatorB)

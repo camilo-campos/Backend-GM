@@ -27,7 +27,7 @@ load_dotenv()
 # Diccionario de mapeo para clasificaciones principales
 TRADUCCIONES_CLASIFICACION = {
     # Categoría principal - Fallas de bomba HRSG
-    "HRSG Pump Failures": "Fallas de Bomba HRSG",
+    "HRSG Pump Failures": "Fallas de Bombas HRSG",
 
     # Subcategorías de HRSG Pump Failures
     "Overheating events in components associated with water pumps": "Eventos de sobrecalentamiento en componentes asociados a bombas de agua",

@@ -194,3 +194,40 @@ class PrediccionBombaB(Base):
     hora_ejecucion = Column(Time, server_default=func.current_time())  # Tipo TIME con valor por defecto
     dia_ejecucion = Column(Date, server_default=func.current_date())  # Tipo DATE con valor por defecto
 
+
+
+# ============================================
+# MODELOS NUEVOS AGREGADOS - 2025-02-17
+# ============================================
+
+class SensorTemperaturaDescansoInternoBombaB(Base):
+    __tablename__ = 'temperatura_descanso_interno_bomba_b'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorTemperaturaDescansoInternaEmpujeBombaB(Base):
+    __tablename__ = 'temperatura_descanso_interna_empuje_bomba_b'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorTemperaturaDescansoInternaMotorBombaB(Base):
+    __tablename__ = 'temperatura_descanso_interna_motor_bomba_b'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
