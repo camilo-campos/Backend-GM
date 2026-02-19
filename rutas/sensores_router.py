@@ -106,6 +106,9 @@ MODEL_PATHS = {
     "temperatura_estator_c": "Temperatura_Estator_MTR_BBA_AA_1A_C.pkl",
     "vibracion_x_descanso_externo": "Vibracion_X_Descanso_Externo_Bomba_1A_A.pkl",
     "vibracion_y_descanso_externo": "Vibracion_Y_Descanso_Externo_Bomba_1A_B.pkl",
+    "vibracion_x_descanso_interno": "Vibracion_X_Descanso_Interno_Bomba_1A_A.pkl",
+    "vibracion_y_descanso_interno": "Vibracion_Y_Descanso_Interno_Bomba_1A_B.pkl",
+    "flujo_descarga": "12FPMFC.1B.OUT.pkl",
 }
 
 class ModelRegistry:
@@ -298,6 +301,16 @@ UMBRAL_SENSORES = {
         "umbral_critica": 15,
     },
     'prediccion_flujo-descarga': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_vibracion-x-interno': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_vibracion-y-interno': {
         "umbral_minimo": 3,
         "umbral_alerta": 8,
         "umbral_critica": 15,
@@ -792,6 +805,24 @@ SENSOR_INFO = {
             'AVISO': 'Verificar condiciones de operación de la bomba',
             'ALERTA': 'Revisar posibles obstrucciones o variaciones de presión',
             'CRÍTICA': 'Intervención inmediata: Riesgo de operación fuera de rango'
+        }
+    },
+    'prediccion_vibracion-x-interno': {
+        'nombre': 'Vibración X Descanso Interno',
+        'descripcion': 'Vibración en eje X del descanso interno de la bomba de agua de alimentación',
+        'acciones': {
+            'AVISO': 'Verificar estado de rodamientos y alineación',
+            'ALERTA': 'Revisar desbalanceo y condiciones de operación',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de daño en rodamientos internos'
+        }
+    },
+    'prediccion_vibracion-y-interno': {
+        'nombre': 'Vibración Y Descanso Interno',
+        'descripcion': 'Vibración en eje Y del descanso interno de la bomba de agua de alimentación',
+        'acciones': {
+            'AVISO': 'Verificar estado de rodamientos y alineación',
+            'ALERTA': 'Revisar desbalanceo y condiciones de operación',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de daño en rodamientos internos'
         }
     }
 }
@@ -2543,7 +2574,10 @@ async def rango_salida_agua(db: Session = Depends(get_db)):
 # ============================================
 
 # Importar nuevos modelos
-from modelos.modelos import SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno, SensorTemperaturaEstatorC, SensorFlujoDescarga
+from modelos.modelos import (SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno,
+                             SensorTemperaturaEstatorC, SensorFlujoDescarga,
+                             SensorVibracionXDescansoInterno, SensorVibracionYDescansoInterno,
+                             SensorTemperaturaAguaAlim)
 from modelos_b.modelos_b import SensorTemperaturaEstator as SensorTemperaturaEstatorB
 
 @router.get(
@@ -2722,18 +2756,162 @@ async def predecir_temperatura_estator_c(sensor: SensorInput, db: Session = Depe
 
 @router.get(
     "/flujo-descarga",
-    summary="Historico - Flujo descarga",
+    summary="Historico - Flujo descarga AP",
     description="""
-Obtiene registros historicos del sensor de flujo de descarga de la Bomba A.
+Obtiene registros historicos del sensor de flujo de descarga de alta presion de la Bomba A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos del sensor de flujo de descarga"
+)
+async def get_sensores_flujo_descarga(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoDescarga, "flujo_descarga", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_flujo-descarga",
+    summary="Detectar anomalia - Flujo descarga AP",
+    description="""
+Analiza el flujo de descarga de alta presion de la Bomba A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de flujo (kg/h)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_flujo_descarga(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_descarga", umbral_key="prediccion_flujo-descarga", model_class=SensorFlujoDescarga)
+
+
+@router.get(
+    "/vibracion-x-interno",
+    summary="Historico - Vibracion X descanso interno",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje X del descanso interno de la Bomba A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de vibracion X interno"
+)
+async def get_sensores_vibracion_x_interno(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorVibracionXDescansoInterno, "vibracion_x_descanso_interno", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_vibracion-x-interno",
+    summary="Detectar anomalia - Vibracion X descanso interno",
+    description="""
+Analiza la vibracion en eje X del descanso interno de la Bomba A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de vibracion (um)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_vibracion_x_interno(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="vibracion_x_descanso_interno", umbral_key="prediccion_vibracion-x-interno", model_class=SensorVibracionXDescansoInterno)
+
+
+@router.get(
+    "/vibracion-y-interno",
+    summary="Historico - Vibracion Y descanso interno",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje Y del descanso interno de la Bomba A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de vibracion Y interno"
+)
+async def get_sensores_vibracion_y_interno(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorVibracionYDescansoInterno, "vibracion_y_descanso_interno", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_vibracion-y-interno",
+    summary="Detectar anomalia - Vibracion Y descanso interno",
+    description="""
+Analiza la vibracion en eje Y del descanso interno de la Bomba A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de vibracion (um)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_vibracion_y_interno(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="vibracion_y_descanso_interno", umbral_key="prediccion_vibracion-y-interno", model_class=SensorVibracionYDescansoInterno)
+
+
+@router.get(
+    "/temperatura-agua-alim",
+    summary="Historico - Temperatura agua alimentacion",
+    description="""
+Obtiene registros historicos del sensor de temperatura del agua de alimentacion a domo MP.
 
 **Parametros de filtrado:**
 - `inicio`: Fecha/hora de inicio (ISO 8601)
 - `termino`: Fecha/hora de fin (ISO 8601)
 - `limite`: Cantidad maxima de registros (10-500, default: 40)
     """,
-    response_description="Lista de registros historicos del sensor de flujo de descarga"
+    response_description="Lista de registros historicos de temperatura agua alimentacion"
 )
-async def get_sensores_flujo_descarga(
+async def get_sensores_temperatura_agua_alim(
     inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
     termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
     limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
@@ -2747,16 +2925,16 @@ async def get_sensores_flujo_descarga(
 
     if fecha_inicio and fecha_termino:
         sensores = (
-            db.query(SensorFlujoDescarga)
-              .filter(SensorFlujoDescarga.tiempo_ejecucion >= fecha_inicio)
-              .filter(SensorFlujoDescarga.tiempo_ejecucion <= fecha_termino)
-              .order_by(SensorFlujoDescarga.tiempo_ejecucion.asc())
+            db.query(SensorTemperaturaAguaAlim)
+              .filter(SensorTemperaturaAguaAlim.tiempo_ejecucion >= fecha_inicio)
+              .filter(SensorTemperaturaAguaAlim.tiempo_ejecucion <= fecha_termino)
+              .order_by(SensorTemperaturaAguaAlim.tiempo_ejecucion.asc())
               .all()
         )
     else:
         sensores = (
-            db.query(SensorFlujoDescarga)
-              .order_by(SensorFlujoDescarga.id.desc())
+            db.query(SensorTemperaturaAguaAlim)
+              .order_by(SensorTemperaturaAguaAlim.id.desc())
               .limit(limite)
               .all()
         )

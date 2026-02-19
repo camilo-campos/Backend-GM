@@ -306,3 +306,36 @@ class SensorVibracionYDescansoExterno(Base):
     valor_sensor = Column(Float)
     clasificacion = Column(Integer, nullable=True)
     contador_anomalias = Column(Integer, default=0)
+
+
+class SensorVibracionXDescansoInterno(Base):
+    __tablename__ = 'vibracion_x_descanso_interno'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorVibracionYDescansoInterno(Base):
+    __tablename__ = 'vibracion_y_descanso_interno'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorTemperaturaAguaAlim(Base):
+    __tablename__ = 'temperatura_agua_alim'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)

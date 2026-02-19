@@ -2151,7 +2151,10 @@ async def get_sensores_voltaje_barra(
 # ============================================
 
 # Importar nuevos modelos
-from modelos_b.modelos_b import SensorTemperaturaDescansoInternoBombaB, SensorTemperaturaDescansoInternaEmpujeBombaB, SensorTemperaturaDescansoInternaMotorBombaB, SensorTemperaturaEstator as SensorTemperaturaEstatorB
+from modelos_b.modelos_b import (SensorTemperaturaDescansoInternoBombaB, SensorTemperaturaDescansoInternaEmpujeBombaB,
+                                 SensorTemperaturaDescansoInternaMotorBombaB, SensorTemperaturaEstator as SensorTemperaturaEstatorB,
+                                 SensorVibracionXDescansoExternoB, SensorVibracionYDescansoExternoB,
+                                 SensorPresionSuccionBAAB, SensorPosicionValvulaRecircB)
 
 @router_b.get(
     "/temp_descanso_bomba",
@@ -2307,3 +2310,227 @@ Analiza la temperatura del estator del motor de la Bomba B - Fase B.
 )
 async def predecir_temperatura_estator_b_bomba_b(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temperatura_estator_b", umbral_key="prediccion_temperatura_estator_b", model_class=SensorTemperaturaEstatorB)
+
+
+@router_b.get(
+    "/vibracion_x_descanso_externo",
+    summary="Historico - Vibracion X descanso externo",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje X del descanso externo de la Bomba B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de vibracion X externo"
+)
+async def get_sensores_vibracion_x_externo_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    try:
+        fecha_inicio = datetime.fromisoformat(inicio) if inicio else None
+        fecha_termino = datetime.fromisoformat(termino) if termino else None
+    except ValueError:
+        return {"message": "Formato de fecha inválido. Use ISO 8601: YYYY-MM-DDTHH:MM:SS"}
+
+    if fecha_inicio and fecha_termino:
+        sensores = (
+            db.query(SensorVibracionXDescansoExternoB)
+              .filter(SensorVibracionXDescansoExternoB.tiempo_ejecucion >= fecha_inicio)
+              .filter(SensorVibracionXDescansoExternoB.tiempo_ejecucion <= fecha_termino)
+              .order_by(SensorVibracionXDescansoExternoB.tiempo_ejecucion.asc())
+              .all()
+        )
+    else:
+        sensores = (
+            db.query(SensorVibracionXDescansoExternoB)
+              .order_by(SensorVibracionXDescansoExternoB.id.desc())
+              .limit(limite)
+              .all()
+        )
+
+    if not sensores:
+        return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_VIBRACION_X_DESCANSO}
+
+    salida = []
+    for s in reversed(sensores):
+        salida.append({
+            "clasificacion": s.clasificacion,
+            "tiempo_sensor": s.tiempo_sensor,
+            "valor_sensor": s.valor_sensor,
+            "id": s.id,
+            "tiempo_ejecucion": s.tiempo_ejecucion.isoformat() if s.tiempo_ejecucion else None
+        })
+    return salida
+
+
+@router_b.get(
+    "/vibracion_y_descanso_externo",
+    summary="Historico - Vibracion Y descanso externo",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje Y del descanso externo de la Bomba B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de vibracion Y externo"
+)
+async def get_sensores_vibracion_y_externo_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    try:
+        fecha_inicio = datetime.fromisoformat(inicio) if inicio else None
+        fecha_termino = datetime.fromisoformat(termino) if termino else None
+    except ValueError:
+        return {"message": "Formato de fecha inválido. Use ISO 8601: YYYY-MM-DDTHH:MM:SS"}
+
+    if fecha_inicio and fecha_termino:
+        sensores = (
+            db.query(SensorVibracionYDescansoExternoB)
+              .filter(SensorVibracionYDescansoExternoB.tiempo_ejecucion >= fecha_inicio)
+              .filter(SensorVibracionYDescansoExternoB.tiempo_ejecucion <= fecha_termino)
+              .order_by(SensorVibracionYDescansoExternoB.tiempo_ejecucion.asc())
+              .all()
+        )
+    else:
+        sensores = (
+            db.query(SensorVibracionYDescansoExternoB)
+              .order_by(SensorVibracionYDescansoExternoB.id.desc())
+              .limit(limite)
+              .all()
+        )
+
+    if not sensores:
+        return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_VIBRACION_Y_DESCANSO}
+
+    salida = []
+    for s in reversed(sensores):
+        salida.append({
+            "clasificacion": s.clasificacion,
+            "tiempo_sensor": s.tiempo_sensor,
+            "valor_sensor": s.valor_sensor,
+            "id": s.id,
+            "tiempo_ejecucion": s.tiempo_ejecucion.isoformat() if s.tiempo_ejecucion else None
+        })
+    return salida
+
+
+@router_b.get(
+    "/presion_succion_baa",
+    summary="Historico - Presion succion BAA",
+    description="""
+Obtiene registros historicos del sensor de presion de succion BAA de la Bomba B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de presion succion BAA"
+)
+async def get_sensores_presion_succion_baa_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    try:
+        fecha_inicio = datetime.fromisoformat(inicio) if inicio else None
+        fecha_termino = datetime.fromisoformat(termino) if termino else None
+    except ValueError:
+        return {"message": "Formato de fecha inválido. Use ISO 8601: YYYY-MM-DDTHH:MM:SS"}
+
+    if fecha_inicio and fecha_termino:
+        sensores = (
+            db.query(SensorPresionSuccionBAAB)
+              .filter(SensorPresionSuccionBAAB.tiempo_ejecucion >= fecha_inicio)
+              .filter(SensorPresionSuccionBAAB.tiempo_ejecucion <= fecha_termino)
+              .order_by(SensorPresionSuccionBAAB.tiempo_ejecucion.asc())
+              .all()
+        )
+    else:
+        sensores = (
+            db.query(SensorPresionSuccionBAAB)
+              .order_by(SensorPresionSuccionBAAB.id.desc())
+              .limit(limite)
+              .all()
+        )
+
+    if not sensores:
+        return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
+
+    salida = []
+    for s in reversed(sensores):
+        salida.append({
+            "clasificacion": s.clasificacion,
+            "tiempo_sensor": s.tiempo_sensor,
+            "valor_sensor": s.valor_sensor,
+            "id": s.id,
+            "tiempo_ejecucion": s.tiempo_ejecucion.isoformat() if s.tiempo_ejecucion else None
+        })
+    return salida
+
+
+@router_b.get(
+    "/posicion_valvula_recirc",
+    summary="Historico - Posicion valvula recirculacion",
+    description="""
+Obtiene registros historicos del sensor de posicion de la valvula de recirculacion de la Bomba B.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos de posicion valvula recirculacion"
+)
+async def get_sensores_posicion_valvula_recirc_b(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    try:
+        fecha_inicio = datetime.fromisoformat(inicio) if inicio else None
+        fecha_termino = datetime.fromisoformat(termino) if termino else None
+    except ValueError:
+        return {"message": "Formato de fecha inválido. Use ISO 8601: YYYY-MM-DDTHH:MM:SS"}
+
+    if fecha_inicio and fecha_termino:
+        sensores = (
+            db.query(SensorPosicionValvulaRecircB)
+              .filter(SensorPosicionValvulaRecircB.tiempo_ejecucion >= fecha_inicio)
+              .filter(SensorPosicionValvulaRecircB.tiempo_ejecucion <= fecha_termino)
+              .order_by(SensorPosicionValvulaRecircB.tiempo_ejecucion.asc())
+              .all()
+        )
+    else:
+        sensores = (
+            db.query(SensorPosicionValvulaRecircB)
+              .order_by(SensorPosicionValvulaRecircB.id.desc())
+              .limit(limite)
+              .all()
+        )
+
+    if not sensores:
+        return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
+
+    salida = []
+    for s in reversed(sensores):
+        salida.append({
+            "clasificacion": s.clasificacion,
+            "tiempo_sensor": s.tiempo_sensor,
+            "valor_sensor": s.valor_sensor,
+            "id": s.id,
+            "tiempo_ejecucion": s.tiempo_ejecucion.isoformat() if s.tiempo_ejecucion else None
+        })
+    return salida
