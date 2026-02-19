@@ -264,6 +264,28 @@ class SensorFlujoSalida12FPMFC(Base):
 # ============================================
 
 # Bomba A - Nuevos modelos
+class SensorTemperaturaEstatorC(Base):
+    __tablename__ = 'temperatura_estator_c'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoDescarga(Base):
+    __tablename__ = 'flujo_descarga'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
 class SensorVibracionXDescansoExterno(Base):
     __tablename__ = 'vibracion_x_descanso_externo'
 

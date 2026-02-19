@@ -292,6 +292,16 @@ UMBRAL_SENSORES = {
         "umbral_alerta": 8,
         "umbral_critica": 15,
     },
+    'prediccion_temperatura-estator-c': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_flujo-descarga': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
 }
 
 def predecir_sensores_np(modelo, valor):
@@ -764,6 +774,24 @@ SENSOR_INFO = {
             'AVISO': 'Verificar calibración del medidor de flujo',
             'ALERTA': 'Revisar posibles obstrucciones o fallos en el sistema',
             'CRÍTICA': 'Intervención inmediata: Riesgo de operación inadecuada por medición incorrecta'
+        }
+    },
+    'prediccion_temperatura-estator-c': {
+        'nombre': 'Temperatura Estator Fase C',
+        'descripcion': 'Temperatura del estator del motor de la bomba de agua de alimentación - Fase C',
+        'acciones': {
+            'AVISO': 'Verificar sistema de refrigeración del motor',
+            'ALERTA': 'Revisar carga del motor y sistema de ventilación',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla en aislamiento del motor'
+        }
+    },
+    'prediccion_flujo-descarga': {
+        'nombre': 'Flujo Descarga',
+        'descripcion': 'Flujo de descarga de la bomba de agua de alimentación',
+        'acciones': {
+            'AVISO': 'Verificar condiciones de operación de la bomba',
+            'ALERTA': 'Revisar posibles obstrucciones o variaciones de presión',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de operación fuera de rango'
         }
     }
 }
@@ -2515,7 +2543,7 @@ async def rango_salida_agua(db: Session = Depends(get_db)):
 # ============================================
 
 # Importar nuevos modelos
-from modelos.modelos import SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno
+from modelos.modelos import SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno, SensorTemperaturaEstatorC, SensorFlujoDescarga
 from modelos_b.modelos_b import SensorTemperaturaEstator as SensorTemperaturaEstatorB
 
 @router.get(
@@ -2642,3 +2670,107 @@ Analiza la vibracion en eje Y del descanso externo de la Bomba A.
 )
 async def predecir_vibracion_y_externo(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_y_descanso_externo", umbral_key="prediccion_vibracion-y-externo", model_class=SensorVibracionYDescansoExterno)
+
+
+@router.get(
+    "/temperatura-estator-c",
+    summary="Historico - Temperatura estator fase C",
+    description="""
+Obtiene registros historicos del sensor de temperatura del estator del motor de la Bomba A - Fase C.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de temperatura estator fase C"
+)
+async def get_sensores_temperatura_estator_c(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaEstatorC, "temperatura_estator_c", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_temperatura-estator-c",
+    summary="Detectar anomalia - Temperatura estator fase C",
+    description="""
+Analiza la temperatura del estator del motor de la Bomba A - Fase C.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temperatura_estator_c(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temperatura_estator_c", umbral_key="prediccion_temperatura-estator-c", model_class=SensorTemperaturaEstatorC)
+
+
+@router.get(
+    "/flujo-descarga",
+    summary="Historico - Flujo descarga",
+    description="""
+Obtiene registros historicos del sensor de flujo de descarga de la Bomba A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+    """,
+    response_description="Lista de registros historicos del sensor de flujo de descarga"
+)
+async def get_sensores_flujo_descarga(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    try:
+        fecha_inicio = datetime.fromisoformat(inicio) if inicio else None
+        fecha_termino = datetime.fromisoformat(termino) if termino else None
+    except ValueError:
+        return {"message": "Formato de fecha inválido. Use ISO 8601: YYYY-MM-DDTHH:MM:SS"}
+
+    if fecha_inicio and fecha_termino:
+        sensores = (
+            db.query(SensorFlujoDescarga)
+              .filter(SensorFlujoDescarga.tiempo_ejecucion >= fecha_inicio)
+              .filter(SensorFlujoDescarga.tiempo_ejecucion <= fecha_termino)
+              .order_by(SensorFlujoDescarga.tiempo_ejecucion.asc())
+              .all()
+        )
+    else:
+        sensores = (
+            db.query(SensorFlujoDescarga)
+              .order_by(SensorFlujoDescarga.id.desc())
+              .limit(limite)
+              .all()
+        )
+
+    if not sensores:
+        return {"message": "No hay datos en la base de datos, devolviendo valores por defecto", "data": DEFAULT_SENSORES_PRESION_AGUA}
+
+    salida = []
+    for s in reversed(sensores):
+        salida.append({
+            "clasificacion": s.clasificacion,
+            "tiempo_sensor": s.tiempo_sensor,
+            "valor_sensor": s.valor_sensor,
+            "id": s.id,
+            "tiempo_ejecucion": s.tiempo_ejecucion.isoformat() if s.tiempo_ejecucion else None
+        })
+    return salida
