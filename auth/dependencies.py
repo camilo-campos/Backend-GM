@@ -1,31 +1,66 @@
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
 from typing import Optional, Dict, Any
 import logging
+import os
 
 from .jwt_handler import verify_token
+from .config import INTERNAL_API_KEY
 
 logger = logging.getLogger(__name__)
 
 # Esquema de seguridad Bearer
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # Cambiado a False para permitir API Key
 security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> Dict[str, Any]:
     """
-    Dependencia que extrae y valida el token JWT del header Authorization.
-    Requiere autenticación - falla si no hay token válido.
+    Dependencia que extrae y valida el token JWT o API Key.
+
+    Soporta dos metodos de autenticacion:
+    1. Token JWT de IBM App ID (header Authorization: Bearer <token>)
+    2. API Key interna para comunicacion backend-a-backend (header X-API-Key)
 
     Returns:
         Diccionario con la información del usuario extraída del token
 
     Raises:
-        HTTPException 401: Si no hay token o es inválido
+        HTTPException 401: Si no hay token/api-key válido
     """
+
+    # Opcion 1: Verificar API Key interna (para segundo backend)
+    if x_api_key:
+        if x_api_key == INTERNAL_API_KEY:
+            logger.debug("Autenticacion exitosa via API Key interna")
+            return {
+                "sub": "internal-service",
+                "email": "service@internal.gm",
+                "name": "Internal Service",
+                "roles": ["service"],
+                "groups": ["internal"],
+                "auth_method": "api_key"
+            }
+        else:
+            logger.warning("API Key invalida recibida")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API Key invalida"
+            )
+
+    # Opcion 2: Verificar token JWT de IBM App ID
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token o API Key requerido",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
     token = credentials.credentials
 
     try:
@@ -44,7 +79,8 @@ async def get_current_user(
             "iss": payload.get("iss"),
             "aud": payload.get("aud"),
             "exp": payload.get("exp"),
-            "iat": payload.get("iat")
+            "iat": payload.get("iat"),
+            "auth_method": "jwt"
         }
 
         return user_data

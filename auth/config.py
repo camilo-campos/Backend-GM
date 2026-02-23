@@ -19,3 +19,7 @@ JWT_AUDIENCE = IBM_APPID_CLIENT_ID
 
 # Configuración de caché para JWKS (en segundos)
 JWKS_CACHE_TTL = 3600  # 1 hora
+
+# API Key para comunicacion interna backend-a-backend
+# IMPORTANTE: Cambiar en produccion usando variable de entorno
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "gm-internal-service-key-2025")
