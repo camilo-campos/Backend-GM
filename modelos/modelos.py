@@ -284,3 +284,74 @@ class SensorVibracionYDescansoExterno(Base):
     valor_sensor = Column(Float)
     clasificacion = Column(Integer, nullable=True)
     contador_anomalias = Column(Integer, default=0)
+
+
+class SensorTemperaturaEstatorC(Base):
+    __tablename__ = 'temperatura_estator_c'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoDescarga(Base):
+    __tablename__ = 'flujo_descarga'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorVibracionXDescansoInterno(Base):
+    __tablename__ = 'vibracion_x_descanso_interno_bomba_1a'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorVibracionYDescansoInterno(Base):
+    __tablename__ = 'vibracion_y_descanso_interno_bomba_1a'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+# ============================================
+# MODELOS NUEVOS AGREGADOS - 2025-02-23
+# Señales compartidas entre Bomba A y B
+# ============================================
+
+class SensorTemperaturaAguaAlimDomoMP(Base):
+    __tablename__ = 'temperatura_agua_alim_domo_mp'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorFlujoDomoAPCompensated(Base):
+    __tablename__ = 'flujo_domo_ap_compensated'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)

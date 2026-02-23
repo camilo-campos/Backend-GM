@@ -11,9 +11,12 @@ from modelos.modelos import (SensorCorriente, SensorSalidaAgua, SensorPresionAgu
                           SensorTemperatura_Ambiental, SensorTemperatura_descanso_interna_empuje_bomba_1aa,
                           SensorTemperatura_descanso_interna_motor_bomba_1a, SensorTemperatura_descanso_interno_bomba_1a,
                           SensorVibracion_axial_descanso, SensorVoltaje_barra, PrediccionBombaA, Alerta, Bitacora,
-                          SensorExcentricidadBomba, SensorFlujoAguaDomoAP, SensorFlujoAguaDomoMP,
+                          SensorExcentricidadBomba, SensorFlujoAguaDomoMP,
                           SensorFlujoAguaRecalentador, SensorFlujoAguaVaporAlta, SensorPosicionValvulaRecirc,
-                          SensorPresionAguaMP, SensorPresionSuccionBAA, SensorTemperaturaEstator, SensorFlujoSalida12FPMFC)
+                          SensorPresionAguaMP, SensorPresionSuccionBAA, SensorTemperaturaEstator, SensorFlujoSalida12FPMFC,
+                          SensorTemperaturaAguaAlimDomoMP, SensorFlujoDomoAPCompensated)
+# Importar tabla compartida flujo_agua_domo_ap_b (usada por ambas bombas)
+from modelos_b.modelos_b import SensorFlujoAguaDomoAP as SensorFlujoAguaDomoAPCompartido
 
 router = APIRouter(prefix="/sensores", tags=["Sensores Bomba A"])
 
@@ -83,8 +86,13 @@ MODEL_PATHS = {
     "presion_agua": "Presi_n_Agua_Alimentacion_Econ._AP.pkl",
     "salida_bomba": "Temperatura_descarga_Bba_Agua_Alim_1A.pkl",
     "temperatura_ambiental": "Temp_Ambiental.pkl",
-    "temp_descanso_bomba_1a": "Vibracion_X_Descanso_Interno_Bomba_1A_A.pkl",
-    "temp_descanso_empuje_bomba_1a": "Vibracion_Y_Descanso_Interno_Bomba_1A_B.pkl",
+    # Temperatura descanso (modelos pendientes - se agregarán cuando estén disponibles)
+    "temp_descanso_bomba_1a": None,  # Pendiente: Temperatura_Descanso_Interno_Bomba_1A.pkl
+    "temp_descanso_empuje_bomba_1a": None,  # Pendiente: Temperatura_Descanso_Interno_Empuje_Bomba_1A_A.pkl
+
+    # Vibración descanso interno (antes estaban mal asignados a temperatura)
+    "vibracion_x_descanso_interno": "Vibracion_X_Descanso_Interno_Bomba_1A_A.pkl",
+    "vibracion_y_descanso_interno": "Vibracion_Y_Descanso_Interno_Bomba_1A_B.pkl",
     "temp_descanso_motor_bomba_1a": "Temperatura_Descanso_Interno_MTR_Bomba_1A.pkl",
     "vibracion_axial_empuje": "Vibracion_Axial_Descanso_Empuje_Bomba_1A.pkl",
     "voltaje_barra": "Voltaje_Barra_6_6KV.pkl",
@@ -106,6 +114,11 @@ MODEL_PATHS = {
     "temperatura_estator_c": "Temperatura_Estator_MTR_BBA_AA_1A_C.pkl",
     "vibracion_x_descanso_externo": "Vibracion_X_Descanso_Externo_Bomba_1A_A.pkl",
     "vibracion_y_descanso_externo": "Vibracion_Y_Descanso_Externo_Bomba_1A_B.pkl",
+    "flujo_descarga": "Temperatura_descarga_Bba_Agua_Alim_1A.pkl",
+
+    # Señales compartidas (2025-02-23)
+    "temp_agua_alim_domo_mp": "Temperatura_Agua_Alim_AP_B.pkl",
+    "flujo_domo_ap_compensated": "Flujo_de_Agua_Alimentaci_n_Domo_AP_Compensated_B.pkl",
 }
 
 class ModelRegistry:
@@ -905,6 +918,15 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
     Si no, busca el último registro o crea uno nuevo.
     """
     try:
+        # Verificar si el modelo está disponible
+        if MODEL_PATHS.get(modelo_key) is None:
+            return {
+                "error": "Modelo no disponible",
+                "mensaje": f"El modelo para '{modelo_key}' aún no está configurado. Se agregará próximamente.",
+                "valor_sensor": sensor.valor,
+                "clasificacion": None
+            }
+
         # Predecir si es anomalía o no
         clase = predecir_sensores_np(modelos[modelo_key], sensor.valor)
         descripcion = "Normal" if clase == 1 else "Anomalía"
@@ -1605,7 +1627,7 @@ Variaciones en el flujo pueden afectar la generación de vapor y el balance tér
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
 async def predecir_flujo_agua_domo_ap(sensor: SensorInput, db: Session = Depends(get_db)):
-    return procesar(sensor, db, modelo_key="flujo_agua_domo_ap", umbral_key="prediccion_flujo-agua-domo-ap", model_class=SensorFlujoAguaDomoAP)
+    return procesar(sensor, db, modelo_key="flujo_agua_domo_ap", umbral_key="prediccion_flujo-agua-domo-ap", model_class=SensorFlujoAguaDomoAPCompartido)
 
 @router.post(
     "/prediccion_flujo-agua-domo-mp",
@@ -1878,18 +1900,24 @@ async def _get_and_classify(
         )
 
     if not sensores:
-        return {"message": f"No hay datos en la base de datos, devolviendo valores por defecto", "data": default_data}
+        # Devolver lista vacía para consistencia con el frontend
+        return []
 
-    no_clasificados = [s for s in sensores if s.clasificacion is None]
-    if no_clasificados:
-        datos = [[s.valor_sensor] for s in no_clasificados]
-        preds = predecir_sensores(datos, modelos[model_key])
-        for obj, cl in zip(no_clasificados, preds):
-            obj.clasificacion = int(cl)
-            db.add(obj)
-        db.commit()
-        for obj in no_clasificados:
-            db.refresh(obj)
+    # DESACTIVADO: Clasificación automática en GET para mejorar velocidad
+    # La clasificación ahora solo se hace en los endpoints POST
+    # no_clasificados = [s for s in sensores if s.clasificacion is None]
+    # if no_clasificados and MODEL_PATHS.get(model_key) is not None:
+    #     try:
+    #         datos = [[s.valor_sensor] for s in no_clasificados]
+    #         preds = predecir_sensores(datos, modelos[model_key])
+    #         for obj, cl in zip(no_clasificados, preds):
+    #             obj.clasificacion = int(cl)
+    #             db.add(obj)
+    #         db.commit()
+    #         for obj in no_clasificados:
+    #             db.refresh(obj)
+    #     except Exception as e:
+    #         logger.warning(f"Error al clasificar con modelo {model_key}: {e}")
 
     salida = []
     for s in reversed(sensores):
@@ -2229,7 +2257,7 @@ async def get_sensores_flujo_agua_domo_ap(
     limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorFlujoAguaDomoAP, "flujo_agua_domo_ap", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+    return await _get_and_classify(db, SensorFlujoAguaDomoAPCompartido, "flujo_agua_domo_ap", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
 @router.get(
     "/flujo-agua-domo-mp",
@@ -2515,7 +2543,11 @@ async def rango_salida_agua(db: Session = Depends(get_db)):
 # ============================================
 
 # Importar nuevos modelos
-from modelos.modelos import SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno
+from modelos.modelos import (
+    SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno,
+    SensorTemperaturaEstatorC, SensorFlujoDescarga,
+    SensorVibracionXDescansoInterno, SensorVibracionYDescansoInterno
+)
 from modelos_b.modelos_b import SensorTemperaturaEstator as SensorTemperaturaEstatorB
 
 @router.get(
@@ -2642,3 +2674,357 @@ Analiza la vibracion en eje Y del descanso externo de la Bomba A.
 )
 async def predecir_vibracion_y_externo(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_y_descanso_externo", umbral_key="prediccion_vibracion-y-externo", model_class=SensorVibracionYDescansoExterno)
+
+
+@router.get(
+    "/temperatura-estator-c",
+    summary="Historico - Temperatura estator fase C",
+    description="""
+Obtiene registros historicos del sensor de temperatura del estator del motor de la Bomba A - Fase C.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de temperatura estator fase C"
+)
+async def get_sensores_temperatura_estator_c(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaEstatorC, "temperatura_estator_c", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_temperatura-estator-c",
+    summary="Detectar anomalia - Temperatura estator fase C",
+    description="""
+Analiza la temperatura del estator del motor de la Bomba A - Fase C.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temperatura_estator_c(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temperatura_estator_c", umbral_key="prediccion_temperatura-estator-c", model_class=SensorTemperaturaEstatorC)
+
+
+@router.get(
+    "/flujo-descarga",
+    summary="Historico - Flujo de descarga bomba",
+    description="""
+Obtiene registros historicos del sensor de flujo/temperatura de descarga de la Bomba A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de flujo de descarga"
+)
+async def get_sensores_flujo_descarga(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoDescarga, "flujo_descarga", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_flujo-descarga",
+    summary="Detectar anomalia - Flujo de descarga bomba",
+    description="""
+Analiza el flujo/temperatura de descarga de la Bomba A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de flujo/temperatura
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_flujo_descarga(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_descarga", umbral_key="prediccion_flujo-descarga", model_class=SensorFlujoDescarga)
+
+
+# ============================================
+# ENDPOINTS VIBRACION DESCANSO INTERNO
+# ============================================
+
+@router.get(
+    "/vibracion-x-interno",
+    summary="Historico - Vibracion X descanso interno",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje X del descanso interno de la Bomba 1A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de vibracion X interno"
+)
+async def get_sensores_vibracion_x_interno(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorVibracionXDescansoInterno, "vibracion_x_descanso_interno", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_vibracion-x-interno",
+    summary="Detectar anomalia - Vibracion X descanso interno",
+    description="""
+Analiza la vibracion en eje X del descanso interno de la Bomba 1A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de vibracion (um)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_vibracion_x_interno(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="vibracion_x_descanso_interno", umbral_key="prediccion_vibracion-x-interno", model_class=SensorVibracionXDescansoInterno)
+
+
+@router.get(
+    "/vibracion-y-interno",
+    summary="Historico - Vibracion Y descanso interno",
+    description="""
+Obtiene registros historicos del sensor de vibracion eje Y del descanso interno de la Bomba 1A.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de vibracion Y interno"
+)
+async def get_sensores_vibracion_y_interno(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorVibracionYDescansoInterno, "vibracion_y_descanso_interno", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_vibracion-y-interno",
+    summary="Detectar anomalia - Vibracion Y descanso interno",
+    description="""
+Analiza la vibracion en eje Y del descanso interno de la Bomba 1A.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de vibracion (um)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_vibracion_y_interno(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="vibracion_y_descanso_interno", umbral_key="prediccion_vibracion-y-interno", model_class=SensorVibracionYDescansoInterno)
+
+
+# ============================================
+# ENDPOINTS SEÑALES COMPARTIDAS - 2025-02-23
+# ============================================
+
+@router.get(
+    "/temperatura-agua-alim-domo-mp",
+    summary="Historico - Temperatura agua alimentacion domo MP",
+    description="""
+Obtiene registros historicos del sensor de temperatura de agua alimentacion al domo de media presion.
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de temperatura agua alim domo MP"
+)
+async def get_sensores_temp_agua_alim_domo_mp(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaAguaAlimDomoMP, "temp_agua_alim_domo_mp", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_temperatura-agua-alim-domo-mp",
+    summary="Detectar anomalia - Temperatura agua alimentacion domo MP",
+    description="""
+Analiza la temperatura de agua alimentacion al domo de media presion.
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de temperatura (C)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_temp_agua_alim_domo_mp(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="temp_agua_alim_domo_mp", umbral_key="prediccion_temperatura-agua-alim-domo-mp", model_class=SensorTemperaturaAguaAlimDomoMP)
+
+
+@router.get(
+    "/flujo-domo-ap-compensated",
+    summary="Historico - Flujo agua domo AP compensado",
+    description="""
+Obtiene registros historicos del sensor de flujo de agua al domo de alta presion (compensado).
+
+**Parametros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad maxima de registros (10-500, default: 40)
+
+**Clasificacion automatica:**
+Los registros sin clasificacion se clasifican automaticamente usando ML.
+    """,
+    response_description="Lista de registros historicos de flujo domo AP compensado"
+)
+async def get_sensores_flujo_domo_ap_compensated(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoDomoAPCompensated, "flujo_domo_ap_compensated", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.post(
+    "/prediccion_flujo-domo-ap-compensated",
+    summary="Detectar anomalia - Flujo agua domo AP compensado",
+    description="""
+Analiza el flujo de agua al domo de alta presion (compensado).
+
+**Modelo:** Isolation Forest (deteccion de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numerico de flujo (kg/h)
+
+**Sistema de alertas:**
+Se evaluan las anomalias en una ventana de 8 horas:
+- **AVISO**: 3+ anomalias
+- **ALERTA**: 8+ anomalias
+- **CRITICA**: 15+ anomalias
+    """,
+    response_description="Resultado de la prediccion con clasificacion y estado de alertas"
+)
+async def predecir_flujo_domo_ap_compensated(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_domo_ap_compensated", umbral_key="prediccion_flujo-domo-ap-compensated", model_class=SensorFlujoDomoAPCompensated)
+
+
+# ============================================
+# ENDPOINTS ALIAS - Compatibilidad Frontend
+# ============================================
+
+@router.get(
+    "/temperatura-agua-alim",
+    summary="Historico - Temperatura agua alimentacion (alias)",
+    description="""
+Alias de `/temperatura-agua-alim-domo-mp`.
+Obtiene registros historicos del sensor de temperatura de agua alimentacion al domo MP.
+    """,
+    response_description="Lista de registros historicos de temperatura agua alimentacion"
+)
+async def get_sensores_temp_agua_alim_alias(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorTemperaturaAguaAlimDomoMP, "temp_agua_alim_domo_mp", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.get(
+    "/mw-brutos-generacion-gas",
+    summary="Historico - MW brutos generacion gas (alias)",
+    description="""
+Alias de `/generacion-gas`.
+Obtiene registros historicos del sensor de generacion de potencia bruta por consumo de gas.
+    """,
+    response_description="Lista de registros historicos de MW brutos"
+)
+async def get_sensores_mw_brutos_gas_alias(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorMw_brutos_generacion_gas, "mw_brutos_gas", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+
+@router.get(
+    "/presion-agua-econ-ap",
+    summary="Historico - Presion agua economizador AP (alias)",
+    description="""
+Alias de `/presion-agua`.
+Obtiene registros historicos del sensor de presion de agua de alimentacion economizador AP.
+    """,
+    response_description="Lista de registros historicos de presion agua"
+)
+async def get_sensores_presion_agua_econ_ap_alias(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorPresionAgua, "presion_agua", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
