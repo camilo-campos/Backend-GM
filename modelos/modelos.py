@@ -355,3 +355,61 @@ class SensorFlujoDomoAPCompensated(Base):
     valor_sensor = Column(Float)
     clasificacion = Column(Integer, nullable=True)
     contador_anomalias = Column(Integer, default=0)
+
+
+# ============================================
+# MODELOS BITÁCORAS GM CON CLASIFICACIÓN LLM
+# Actualizado: 2025-02-23
+# Estructura compatible con bitacoras/bitacoras_b
+# ============================================
+
+from sqlalchemy import Boolean
+
+class GmBitacoraA(Base):
+    """Bitácoras de operación Bomba A - Compatible con frontend"""
+    __tablename__ = 'gm_bitacoras_a'
+
+    # Campos principales (compatibles con bitacoras)
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, nullable=True)
+    bitacora = Column(Text, nullable=True)  # Contenido principal
+    clasificacion = Column(Text, nullable=True)  # Clasificación LLM
+    alerta_aviso = Column(Text, nullable=True)  # Segundo análisis
+
+    # Campos originales de gm_bitacoras
+    bomba_activa = Column(String, nullable=True)
+    fecha = Column('Fecha', Date, nullable=True)
+    hora = Column('Hora', String, nullable=True)
+    observaciones = Column('Observaciones', Text, nullable=True)
+
+    # Campos extras de clasificación
+    categoria = Column(String(100), nullable=True)
+    prioridad = Column(String(20), default='MEDIA')
+    procesado_llm = Column(Boolean, default=False)
+    fecha_procesado = Column(DateTime, nullable=True)
+    resumen_llm = Column(Text, nullable=True)
+
+
+class GmBitacoraB(Base):
+    """Bitácoras de operación Bomba B - Compatible con frontend"""
+    __tablename__ = 'gm_bitacoras_b'
+
+    # Campos principales (compatibles con bitacoras_b)
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, nullable=True)
+    bitacora = Column(Text, nullable=True)
+    clasificacion = Column(Text, nullable=True)
+    alerta_aviso = Column(Text, nullable=True)
+
+    # Campos originales de gm_bitacoras
+    bomba_activa = Column(String, nullable=True)
+    fecha = Column('Fecha', Date, nullable=True)
+    hora = Column('Hora', String, nullable=True)
+    observaciones = Column('Observaciones', Text, nullable=True)
+
+    # Campos extras de clasificación
+    categoria = Column(String(100), nullable=True)
+    prioridad = Column(String(20), default='MEDIA')
+    procesado_llm = Column(Boolean, default=False)
+    fecha_procesado = Column(DateTime, nullable=True)
+    resumen_llm = Column(Text, nullable=True)
