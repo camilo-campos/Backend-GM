@@ -15,7 +15,12 @@ from modelos.modelos import (
     SensorExcentricidadBomba, SensorFlujoAguaDomoAP, SensorFlujoAguaDomoMP,
     SensorFlujoAguaRecalentador, SensorFlujoAguaVaporAlta,
     SensorPosicionValvulaRecirc, SensorPresionAguaMP, SensorPresionSuccionBAA,
-    SensorTemperaturaEstator, SensorFlujoSalida12FPMFC
+    SensorTemperaturaEstator, SensorFlujoSalida12FPMFC,
+    SensorVibracionXDescansoExterno, SensorVibracionYDescansoExterno,
+    SensorVibracionXDescansoInterno, SensorVibracionYDescansoInterno,
+    # Sensores adicionales Bomba A
+    SensorTemperaturaEstatorC, SensorFlujoDescarga,
+    SensorTemperaturaAguaAlimDomoMP, SensorFlujoDomoAPCompensated
 )
 from modelos_b.modelos_b import (
     Alerta as AlertaB,
@@ -33,7 +38,18 @@ from modelos_b.modelos_b import (
     SensorVibracionAxialEmpuje as SensorVibracionAxialEmpujeB,
     SensorVibracionXDescanso as SensorVibracionXDescansoB,
     SensorVibracionYDescanso as SensorVibracionYDescansoB,
-    SensorVoltajeBarra as SensorVoltajeBarraB
+    SensorVoltajeBarra as SensorVoltajeBarraB,
+    # Sensores adicionales Bomba B
+    SensorTemperaturaDescansoInternoBombaB,
+    SensorTemperaturaDescansoInternaEmpujeBombaB,
+    SensorTemperaturaDescansoInternaMotorBombaB,
+    SensorVibracionXDescansoExternoB,
+    SensorVibracionYDescansoExternoB,
+    SensorPresionSuccionBAAB,
+    SensorPosicionValvulaRecircB,
+    SensorFlujoDomoAPCompensatedB,
+    SensorMwBrutosGeneracionGasB,
+    SensorPresionAguaEconAPB
 )
 
 
@@ -74,6 +90,23 @@ MAPEO_SENSORES_A = {
     "prediccion_temperatura-estator": SensorTemperaturaEstator,  # Nombre real del endpoint
     "prediccion_flujo-12fpmfc": SensorFlujoSalida12FPMFC,
     "prediccion_flujo-salida-12fpmfc": SensorFlujoSalida12FPMFC,  # Nombre real del endpoint
+    # Sensores de vibración adicionales
+    "prediccion_vibracion-x-externo": SensorVibracionXDescansoExterno,
+    "prediccion_vibracion-x-descanso-externo": SensorVibracionXDescansoExterno,
+    "prediccion_vibracion-y-externo": SensorVibracionYDescansoExterno,
+    "prediccion_vibracion-y-descanso-externo": SensorVibracionYDescansoExterno,
+    "prediccion_vibracion-x-interno": SensorVibracionXDescansoInterno,
+    "prediccion_vibracion-x-descanso-interno": SensorVibracionXDescansoInterno,
+    "prediccion_vibracion-y-interno": SensorVibracionYDescansoInterno,
+    "prediccion_vibracion-y-descanso-interno": SensorVibracionYDescansoInterno,
+    # Sensores adicionales Bomba A
+    "prediccion_temperatura-estator-c": SensorTemperaturaEstatorC,
+    "prediccion_temp-estator-c": SensorTemperaturaEstatorC,
+    "prediccion_flujo-descarga": SensorFlujoDescarga,
+    "prediccion_temperatura-agua-alim-domo-mp": SensorTemperaturaAguaAlimDomoMP,
+    "prediccion_temp-agua-alim-domo-mp": SensorTemperaturaAguaAlimDomoMP,
+    "prediccion_flujo-domo-ap-compensated": SensorFlujoDomoAPCompensated,
+    "prediccion_flujo-agua-domo-ap-compensated": SensorFlujoDomoAPCompensated,
 }
 
 # Mapeo de tipo_sensor a modelo de sensor (Bomba B)
@@ -94,10 +127,68 @@ MAPEO_SENSORES_B = {
     "prediccion_vibracion_x_descanso": SensorVibracionXDescansoB,
     "prediccion_vibracion_y_descanso": SensorVibracionYDescansoB,
     "prediccion_voltaje_barra": SensorVoltajeBarraB,
+    # Sensores adicionales Bomba B
+    "prediccion_temperatura_descanso_interno": SensorTemperaturaDescansoInternoBombaB,
+    "prediccion_temp_descanso_interno": SensorTemperaturaDescansoInternoBombaB,
+    "prediccion_temperatura_descanso_empuje": SensorTemperaturaDescansoInternaEmpujeBombaB,
+    "prediccion_temp_descanso_empuje": SensorTemperaturaDescansoInternaEmpujeBombaB,
+    "prediccion_temperatura_descanso_motor": SensorTemperaturaDescansoInternaMotorBombaB,
+    "prediccion_temp_descanso_motor": SensorTemperaturaDescansoInternaMotorBombaB,
+    "prediccion_vibracion_x_externo": SensorVibracionXDescansoExternoB,
+    "prediccion_vibracion_x_descanso_externo": SensorVibracionXDescansoExternoB,
+    "prediccion_vibracion_y_externo": SensorVibracionYDescansoExternoB,
+    "prediccion_vibracion_y_descanso_externo": SensorVibracionYDescansoExternoB,
+    "prediccion_presion_succion": SensorPresionSuccionBAAB,
+    "prediccion_presion_succion_baa": SensorPresionSuccionBAAB,
+    "prediccion_posicion_valvula": SensorPosicionValvulaRecircB,
+    "prediccion_posicion_valvula_recirc": SensorPosicionValvulaRecircB,
+    "prediccion_flujo_domo_ap_compensated": SensorFlujoDomoAPCompensatedB,
+    "prediccion_flujo_agua_domo_ap_compensated": SensorFlujoDomoAPCompensatedB,
+    "prediccion_mw_brutos": SensorMwBrutosGeneracionGasB,
+    "prediccion_mw_brutos_gas": SensorMwBrutosGeneracionGasB,
+    "prediccion_presion_agua_econ_ap": SensorPresionAguaEconAPB,
 }
 
 
 router = APIRouter(prefix="/alertas_umbral", tags=["Alertas"])
+
+
+def _verificar_datos_disponibles(db: Session, modelo_sensor, timestamp_inicio, timestamp_fin) -> bool:
+    """
+    Verifica si existen datos del sensor en el rango de tiempo especificado.
+    Retorna True si hay al menos un registro, False si no hay datos.
+    """
+    if not modelo_sensor or not timestamp_inicio or not timestamp_fin:
+        return False
+
+    try:
+        count = db.query(modelo_sensor).filter(
+            modelo_sensor.tiempo_ejecucion >= timestamp_inicio,
+            modelo_sensor.tiempo_ejecucion <= timestamp_fin
+        ).limit(1).count()
+        return count > 0
+    except Exception:
+        return False
+
+
+def _obtener_rango_datos_sensor(db: Session, modelo_sensor):
+    """
+    Obtiene el rango de fechas disponibles para un sensor.
+    Retorna (fecha_min, fecha_max) o (None, None) si no hay datos.
+    """
+    if not modelo_sensor:
+        return None, None
+
+    try:
+        from sqlalchemy import func
+        result = db.query(
+            func.min(modelo_sensor.tiempo_ejecucion),
+            func.max(modelo_sensor.tiempo_ejecucion)
+        ).first()
+        return result[0], result[1]
+    except Exception:
+        return None, None
+
 
 async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
     """
@@ -137,8 +228,19 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
     # Ordenar la lista combinada por timestamp (las más recientes primero)
     # Convertimos cada alerta a un diccionario y añadimos un campo 'origen' para identificar de qué bomba proviene
     alertas_formateadas = []
-    
+
     for alerta in alertas_a:
+        # Verificar si hay datos disponibles para esta alerta
+        datos_disponibles = False
+        if alerta.timestamp_inicio_anomalia and alerta.timestamp_fin_anomalia:
+            modelo_sensor = MAPEO_SENSORES_A.get(alerta.tipo_sensor)
+            if modelo_sensor:
+                datos_disponibles = _verificar_datos_disponibles(
+                    db, modelo_sensor,
+                    alerta.timestamp_inicio_anomalia,
+                    alerta.timestamp_fin_anomalia
+                )
+
         alerta_dict = {
             "id": alerta.id,
             "sensor_id": alerta.sensor_id,
@@ -148,11 +250,23 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
             "origen": "Bomba A",
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,
-            "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None
+            "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None,
+            "datos_disponibles": datos_disponibles
         }
         alertas_formateadas.append(alerta_dict)
 
     for alerta in alertas_b:
+        # Verificar si hay datos disponibles para esta alerta
+        datos_disponibles = False
+        if alerta.timestamp_inicio_anomalia and alerta.timestamp_fin_anomalia:
+            modelo_sensor = MAPEO_SENSORES_B.get(alerta.tipo_sensor)
+            if modelo_sensor:
+                datos_disponibles = _verificar_datos_disponibles(
+                    db, modelo_sensor,
+                    alerta.timestamp_inicio_anomalia,
+                    alerta.timestamp_fin_anomalia
+                )
+
         alerta_dict = {
             "id": alerta.id,
             "sensor_id": alerta.sensor_id,
@@ -162,10 +276,11 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
             "origen": "Bomba B",
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,
-            "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None
+            "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None,
+            "datos_disponibles": datos_disponibles
         }
         alertas_formateadas.append(alerta_dict)
-    
+
     # Ordenar por timestamp descendente (las más recientes primero)
     alertas_formateadas.sort(key=lambda x: x["timestamp"], reverse=True)
 
