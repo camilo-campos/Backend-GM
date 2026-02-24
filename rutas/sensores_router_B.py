@@ -285,161 +285,163 @@ def predecir_sensores_optimizado(modelo_key, valor_tuple):
 VENTANA_HORAS = 8  # horas
 
 # ——— Configuracion de umbrales por sensor ———
-# NOTA: Umbrales ajustados para pruebas con datos limitados (100 registros por sensor)
-# En produccion, restaurar valores originales segun analisis historico
+# Umbrales calculados basados en análisis de datos históricos Bomba B
+# Fórmula: minimo ≈ 50% crítica, alerta ≈ 80% crítica
 UMBRAL_SENSORES = {
+    # === Sensores principales Bomba B ===
     'prediccion_corriente': {
-        "umbral_minimo": 3,   # AVISO
-        "umbral_alerta": 8,   # ALERTA
-        "umbral_critica": 15, # CRITICA
+        "umbral_minimo": 54,    # 50% de 108
+        "umbral_alerta": 86,    # 80% de 108
+        "umbral_critica": 108,  # Corriente MTR BBA Agua Alim 1B
     },
     'prediccion_presion_agua': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 25,    # 50% de 51
+        "umbral_alerta": 41,    # 80% de 51
+        "umbral_critica": 51,   # Presión Agua Alimentación Econ. AP
     },
     'prediccion_temperatura_ambiental': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 14,    # Similar a Bomba A
+        "umbral_alerta": 22,
+        "umbral_critica": 28,
     },
     'prediccion_excentricidad_bomba': {
-        "umbral_minimo": 3,
+        "umbral_minimo": 5,     # Valor mínimo (original era 0)
         "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_critica": 10,
     },
     'prediccion_flujo_descarga': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 66,    # 50% de 132
+        "umbral_alerta": 106,   # 80% de 132
+        "umbral_critica": 132,  # Flujo Descarga AP BAA AE01B
     },
     'prediccion_flujo_agua_domo_ap': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 39,    # 50% de 78
+        "umbral_alerta": 62,    # 80% de 78
+        "umbral_critica": 78,   # Flujo de Agua Alimentación Domo AP Compensated
     },
     'prediccion_flujo_agua_domo_mp': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 22,    # 50% de 45
+        "umbral_alerta": 36,    # 80% de 45
+        "umbral_critica": 45,   # Flujo de Agua Alimentación Domo MP Compensated
     },
     'prediccion_flujo_agua_recalentador': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 45,    # 50% de 91
+        "umbral_alerta": 73,    # 80% de 91
+        "umbral_critica": 91,   # Flujo de Agua/Atemp Recale Calient RH
     },
     'prediccion_flujo_agua_vapor_alta': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 13,    # 50% de 26
+        "umbral_alerta": 21,    # 80% de 26
+        "umbral_critica": 26,   # Flujo de Agua/Atemp Vapor Alta AP SH
     },
     'prediccion_temperatura_agua_alim': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 16,    # 50% de 32
+        "umbral_alerta": 26,    # 80% de 32
+        "umbral_critica": 32,   # Temperatura Agua Alim AP
     },
     'prediccion_temperatura_estator': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 36,    # 50% de 73
+        "umbral_alerta": 58,    # 80% de 73
+        "umbral_critica": 73,   # Temperatura Estator MTR BBA AA 1B A
     },
     'prediccion_vibracion_axial_empuje': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 52,    # 50% de 104
+        "umbral_alerta": 83,    # 80% de 104
+        "umbral_critica": 104,  # Vibración Axial Descanso Emp Bomba 1B
     },
     'prediccion_vibracion_x_descanso': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 67,    # 50% de 133
+        "umbral_alerta": 106,   # 80% de 133
+        "umbral_critica": 133,  # Vibración X Descanso Interno Bomba 1B
     },
     'prediccion_vibracion_y_descanso': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 54,    # 50% de 107
+        "umbral_alerta": 86,    # 80% de 107
+        "umbral_critica": 107,  # Vibración Y Descanso Interno Bomba 1B
     },
     'prediccion_voltaje_barra': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 18,    # 50% de 35
+        "umbral_alerta": 28,    # 80% de 35
+        "umbral_critica": 35,   # Voltaje Barra 6,6KV
     },
+    # === Aliases para compatibilidad ===
     'prediccion_temp-descanso-bomba-1a': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 86,
+        "umbral_alerta": 137,
+        "umbral_critica": 171,
     },
     'prediccion_temp-empuje-bomba-1a': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 55,
+        "umbral_alerta": 88,
+        "umbral_critica": 110,
     },
     'prediccion_temp-motor-bomba-1a': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 13,
+        "umbral_alerta": 20,
+        "umbral_critica": 25,
     },
     'prediccion_vibracion-axial': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 52,
+        "umbral_alerta": 83,
+        "umbral_critica": 104,
     },
     'prediccion_voltaje-barra': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 18,
+        "umbral_alerta": 28,
+        "umbral_critica": 35,
     },
-    # Temperaturas descanso Bomba B (corregidas 2025-02-23)
+    # === Temperaturas descanso Bomba B ===
     'prediccion_temp_descanso_bomba': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 86,
+        "umbral_alerta": 137,
+        "umbral_critica": 171,
     },
     'prediccion_temp_descanso_empuje': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 55,
+        "umbral_alerta": 88,
+        "umbral_critica": 110,
     },
     'prediccion_temp_descanso_motor': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 13,
+        "umbral_alerta": 20,
+        "umbral_critica": 25,
     },
-    # Vibraciones externas (nuevas 2025-02-23)
+    # === Vibraciones externas ===
     'prediccion_vibracion_x_descanso_externo': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 60,
+        "umbral_alerta": 96,
+        "umbral_critica": 120,
     },
     'prediccion_vibracion_y_descanso_externo': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 50,
+        "umbral_alerta": 80,
+        "umbral_critica": 100,
     },
-    # Nuevos sensores (2025-02-23)
+    # === Nuevos sensores ===
     'prediccion_presion_succion_baa': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 25,
+        "umbral_alerta": 40,
+        "umbral_critica": 50,
     },
     'prediccion_posicion_valvula_recirc': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 25,
+        "umbral_alerta": 40,
+        "umbral_critica": 50,
     },
     'prediccion_flujo_domo_ap_compensated': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 39,
+        "umbral_alerta": 62,
+        "umbral_critica": 78,
     },
     'prediccion_mw_brutos_generacion_gas': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 56,
+        "umbral_alerta": 90,
+        "umbral_critica": 112,
     },
     'prediccion_presion_agua_econ_ap': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 25,
+        "umbral_alerta": 41,
+        "umbral_critica": 51,
     },
 }
 
@@ -1064,13 +1066,18 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                      .filter(Alerta.tipo_sensor == umbral_key) \
                      .order_by(Alerta.id.desc()) \
                      .first()
-            
+
             # Obtener nivel numérico de alerta previa y actual
             prev_n = nivel_numerico(prev.descripcion) if prev else 0
             curr_n = nivel_numerico(alerta_info["nivel"])
-            
-            # Solo generar nueva alerta si el nivel ha aumentado
-            if curr_n > prev_n:
+
+            # Determinar si debemos crear una nueva alerta:
+            # 1. Si el nivel ha aumentado (normal: AVISO -> ALERTA -> CRÍTICA)
+            # 2. Si es CRÍTICA y la anterior también era CRÍTICA (nuevo ciclo de alertas)
+            es_nuevo_ciclo_critica = (curr_n == 3 and prev_n == 3)  # Ambas CRÍTICA
+            debe_crear_alerta = (curr_n > prev_n) or es_nuevo_ciclo_critica
+
+            if debe_crear_alerta:
                 # Construir mensaje descriptivo (simplificado según requerimiento del cliente)
                 # Formato: tipo de alerta, sensor, bomba, descripción, intervalo, acción recomendada
 
@@ -1087,7 +1094,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
                 mensaje += f"Intervalo: {intervalo}\n"
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
-                
+
                 alerta = Alerta(
                     sensor_id=lectura.id,
                     tipo_sensor=umbral_key,
@@ -1099,12 +1106,14 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 )
                 db.add(alerta)
                 db.commit()
+                print(f"[{umbral_key}] Nueva alerta {alerta_info['nivel']} creada (ciclo nuevo: {es_nuevo_ciclo_critica})")
 
-                # Si alcanzamos nivel CRÍTICA, reiniciar contador a 0
-                if alerta_info["nivel"] == "CRÍTICA":
-                    lectura.contador_anomalias = 0
-                    db.commit()
-                    print(f"[{umbral_key}] Nivel CRÍTICO alcanzado. Contador reiniciado a 0")
+            # IMPORTANTE: Siempre reiniciar contador cuando se alcanza nivel CRÍTICA
+            # Esto permite que las alertas se generen cíclicamente
+            if alerta_info["nivel"] == "CRÍTICA":
+                lectura.contador_anomalias = 0
+                db.commit()
+                print(f"[{umbral_key}] Nivel CRÍTICO alcanzado. Contador reiniciado a 0 para nuevo ciclo de alertas")
 
     return {
         "id_registro": lectura.id,

@@ -213,142 +213,144 @@ def predecir_sensores_optimizado(modelo_key, valor_tuple):
 VENTANA_HORAS = 8  # horas
 
 # ——— Configuracion de umbrales por sensor ———
-# NOTA: Umbrales ajustados para pruebas con datos limitados (100 registros por sensor)
-# En produccion, restaurar valores originales segun analisis historico
+# Umbrales calculados basados en análisis de datos históricos
+# Fórmula: minimo ≈ 50% crítica, alerta ≈ 80% crítica
 UMBRAL_SENSORES = {
+    # === Sensores con umbrales del análisis ML ===
     'prediccion_corriente': {
-        "umbral_minimo": 3,   # AVISO
-        "umbral_alerta": 8,   # ALERTA
-        "umbral_critica": 15, # CRITICA
+        "umbral_minimo": 101,   # AVISO (50%)
+        "umbral_alerta": 162,   # ALERTA (80%)
+        "umbral_critica": 202,  # CRITICA (100%)
     },
     'prediccion_salida-agua': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 49,
+        "umbral_alerta": 78,
+        "umbral_critica": 98,
     },
     'prediccion_presion-agua': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 118,
+        "umbral_alerta": 188,
+        "umbral_critica": 235,
     },
     'prediccion_mw-brutos-gas': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 56,
+        "umbral_alerta": 90,
+        "umbral_critica": 112,
     },
     'prediccion_temperatura-ambiental': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 14,
+        "umbral_alerta": 22,
+        "umbral_critica": 28,
     },
     'prediccion_temp-descanso-bomba-1a': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 86,
+        "umbral_alerta": 137,
+        "umbral_critica": 171,
     },
     'prediccion_temp-empuje-bomba-1a': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 55,
+        "umbral_alerta": 88,
+        "umbral_critica": 110,
     },
     'prediccion_temp-motor-bomba-1a': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 13,
+        "umbral_alerta": 20,
+        "umbral_critica": 25,
     },
     'prediccion_vibracion-axial': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 29,
+        "umbral_alerta": 46,
+        "umbral_critica": 58,
     },
     'prediccion_voltaje-barra': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 18,
+        "umbral_alerta": 29,
+        "umbral_critica": 36,
     },
+    # === Sensores calculados (crítica del análisis, 50%/80% derivados) ===
     'prediccion_flujo-salida-12fpmfc': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 40,    # 50% de 80
+        "umbral_alerta": 64,    # 80% de 80
+        "umbral_critica": 80,
     },
     'prediccion_flujo-agua-domo-ap': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 39,    # 50% de 78
+        "umbral_alerta": 62,    # 80% de 78
+        "umbral_critica": 78,
     },
     'prediccion_flujo-agua-domo-mp': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 22,    # 50% de 45
+        "umbral_alerta": 36,    # 80% de 45
+        "umbral_critica": 45,
     },
     'prediccion_excentricidad-bomba': {
-        "umbral_minimo": 3,
+        "umbral_minimo": 5,     # Valor mínimo razonable
         "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_critica": 10,
     },
     'prediccion_flujo-agua-recalentador': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 45,    # 50% de 91
+        "umbral_alerta": 73,    # 80% de 91
+        "umbral_critica": 91,
     },
     'prediccion_flujo-agua-vapor-alta': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 13,    # 50% de 26
+        "umbral_alerta": 21,    # 80% de 26
+        "umbral_critica": 26,
     },
     'prediccion_posicion-valvula-recirc': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 25,    # Estimado basado en patrones similares
+        "umbral_alerta": 40,
+        "umbral_critica": 50,
     },
     'prediccion_presion-agua-mp': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 25,    # 50% de 51
+        "umbral_alerta": 41,    # 80% de 51
+        "umbral_critica": 51,
     },
     'prediccion_presion-succion-baa': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 25,    # Estimado
+        "umbral_alerta": 40,
+        "umbral_critica": 50,
     },
     'prediccion_temperatura-estator': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 36,    # 50% de 73
+        "umbral_alerta": 58,    # 80% de 73
+        "umbral_critica": 73,
     },
-    # Vibraciones internas (nuevas 2025-02-23)
+    # === Vibraciones internas ===
     'prediccion_vibracion-x-interno': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 67,    # 50% de 133
+        "umbral_alerta": 106,   # 80% de 133
+        "umbral_critica": 133,
     },
     'prediccion_vibracion-y-interno': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 54,    # 50% de 107
+        "umbral_alerta": 86,    # 80% de 107
+        "umbral_critica": 107,
     },
-    # Vibraciones externas (nuevas 2025-02-23)
+    # === Vibraciones externas ===
     'prediccion_vibracion-x-externo': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 60,    # Estimado similar a internas
+        "umbral_alerta": 96,
+        "umbral_critica": 120,
     },
     'prediccion_vibracion-y-externo': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 50,
+        "umbral_alerta": 80,
+        "umbral_critica": 100,
     },
-    # Temperatura agua alimentación domo MP (nueva 2025-02-23)
+    # === Temperatura agua alimentación domo MP ===
     'prediccion_temperatura-agua-alim-domo-mp': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 16,    # 50% de 32
+        "umbral_alerta": 26,    # 80% de 32
+        "umbral_critica": 32,
     },
-    # Flujo domo AP compensated (nueva 2025-02-23)
+    # === Flujo domo AP compensated ===
     'prediccion_flujo-domo-ap-compensated': {
-        "umbral_minimo": 3,
-        "umbral_alerta": 8,
-        "umbral_critica": 15,
+        "umbral_minimo": 39,    # 50% de 78
+        "umbral_alerta": 62,    # 80% de 78
+        "umbral_critica": 78,
     },
 }
 
@@ -1129,13 +1131,18 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                      .filter(Alerta.tipo_sensor == umbral_key) \
                      .order_by(Alerta.id.desc()) \
                      .first()
-            
+
             # Obtener nivel numérico de alerta previa y actual
             prev_n = nivel_numerico(prev.descripcion) if prev else 0
             curr_n = nivel_numerico(alerta_info["nivel"])
-            
-            # Solo generar nueva alerta si el nivel ha aumentado
-            if curr_n > prev_n:
+
+            # Determinar si debemos crear una nueva alerta:
+            # 1. Si el nivel ha aumentado (normal: AVISO -> ALERTA -> CRÍTICA)
+            # 2. Si es CRÍTICA y la anterior también era CRÍTICA (nuevo ciclo de alertas)
+            es_nuevo_ciclo_critica = (curr_n == 3 and prev_n == 3)  # Ambas CRÍTICA
+            debe_crear_alerta = (curr_n > prev_n) or es_nuevo_ciclo_critica
+
+            if debe_crear_alerta:
                 # Construir mensaje descriptivo (simplificado según requerimiento del cliente)
                 # Formato: tipo de alerta, sensor, bomba, descripción, intervalo, acción recomendada
 
@@ -1152,7 +1159,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
                 mensaje += f"Intervalo: {intervalo}\n"
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"
-                
+
                 alerta = Alerta(
                     sensor_id=lectura.id,
                     tipo_sensor=umbral_key,
@@ -1164,12 +1171,14 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 )
                 db.add(alerta)
                 db.commit()
+                print(f"[{umbral_key}] Nueva alerta {alerta_info['nivel']} creada (ciclo nuevo: {es_nuevo_ciclo_critica})")
 
-                # Si alcanzamos nivel CRÍTICA, reiniciar contador a 0
-                if alerta_info["nivel"] == "CRÍTICA":
-                    lectura.contador_anomalias = 0
-                    db.commit()
-                    print(f"[{umbral_key}] Nivel CRÍTICO alcanzado. Contador reiniciado a 0")
+            # IMPORTANTE: Siempre reiniciar contador cuando se alcanza nivel CRÍTICA
+            # Esto permite que las alertas se generen cíclicamente
+            if alerta_info["nivel"] == "CRÍTICA":
+                lectura.contador_anomalias = 0
+                db.commit()
+                print(f"[{umbral_key}] Nivel CRÍTICO alcanzado. Contador reiniciado a 0 para nuevo ciclo de alertas")
 
     return {
         "id_registro": lectura.id,
