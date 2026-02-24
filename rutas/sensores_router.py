@@ -82,13 +82,13 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "modelos_prediccion")  # Ruta absoluta
 MODEL_PATHS = {
     # Modelos originales actualizados
     "corriente_motor": "Corriente_MTR_BBA_Agua_Alim_1A.pkl",
-    "mw_brutos_gas": "model_MW_brutos.pkl",
+    "mw_brutos_gas": "Medicion_de_Pot_Bruta_Planta.pkl",
     "presion_agua": "Presi_n_Agua_Alimentacion_Econ._AP.pkl",
     "salida_bomba": "Temperatura_descarga_Bba_Agua_Alim_1A.pkl",
     "temperatura_ambiental": "Temp_Ambiental.pkl",
-    # Temperatura descanso (modelos pendientes - se agregarán cuando estén disponibles)
-    "temp_descanso_bomba_1a": None,  # Pendiente: Temperatura_Descanso_Interno_Bomba_1A.pkl
-    "temp_descanso_empuje_bomba_1a": None,  # Pendiente: Temperatura_Descanso_Interno_Empuje_Bomba_1A_A.pkl
+    # Temperatura descanso (usando modelos disponibles)
+    "temp_descanso_bomba_1a": "Temperatura_Descanso_Externo_Bomba_1A.pkl",
+    "temp_descanso_empuje_bomba_1a": "Temperatura_Descanso_Externo_Empuje_Bomba_1A_B.pkl",
 
     # Vibración descanso interno (antes estaban mal asignados a temperatura)
     "vibracion_x_descanso_interno": "Vibracion_X_Descanso_Interno_Bomba_1A_A.pkl",
@@ -132,13 +132,24 @@ class ModelRegistry:
         """Obtiene un modelo, cargándolo si es necesario"""
         if model_key not in MODEL_PATHS:
             raise KeyError(f"Modelo no reconocido: {model_key}")
-        
+
+        # Si el modelo está definido como None, retornar None
+        if MODEL_PATHS[model_key] is None:
+            logger.warning(f"Modelo {model_key} no disponible (definido como None)")
+            return None
+
         # Cargar el modelo si aún no está en memoria
         if model_key not in cls._models:
             start_time = time.time()
             logger.info(f"Cargando modelo {model_key}...")
-            
+
             model_path = os.path.join(MODELS_DIR, MODEL_PATHS[model_key])
+
+            # Verificar si el archivo existe
+            if not os.path.exists(model_path):
+                logger.error(f"Archivo de modelo no encontrado: {model_path}")
+                return None
+
             cls._models[model_key] = joblib.load(model_path)
             
             load_time = time.time() - start_time
@@ -301,6 +312,40 @@ UMBRAL_SENSORES = {
         "umbral_critica": 15,
     },
     'prediccion_temperatura-estator': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    # Vibraciones internas (nuevas 2025-02-23)
+    'prediccion_vibracion-x-interno': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_vibracion-y-interno': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    # Vibraciones externas (nuevas 2025-02-23)
+    'prediccion_vibracion-x-externo': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_vibracion-y-externo': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    # Temperatura agua alimentación domo MP (nueva 2025-02-23)
+    'prediccion_temperatura-agua-alim-domo-mp': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    # Flujo domo AP compensated (nueva 2025-02-23)
+    'prediccion_flujo-domo-ap-compensated': {
         "umbral_minimo": 3,
         "umbral_alerta": 8,
         "umbral_critica": 15,

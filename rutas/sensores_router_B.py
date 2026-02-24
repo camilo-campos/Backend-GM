@@ -183,13 +183,13 @@ MODEL_PATHS = {
     "temp_descanso_motor": "Temperatura_Descanso_Interno_MTR_Bomba_1B_G_B.pkl",
     "temperatura_estator_b": "Temperatura_Estator_MTR_BBA_AA_1B_B_B.pkl",
 
-    # Señales faltantes Bomba B (2025-02-23)
-    "vibracion_x_descanso_externo": "Vibraci_n_X_Descanso_Externo_Bomba_1B_B.pkl",
-    "vibracion_y_descanso_externo": "Vibraci_n_Y_Descanso_Externo_Bomba_1B_B.pkl",
-    "presion_succion_baa": None,  # SIN MODELO
-    "posicion_valvula_recirc": None,  # SIN MODELO
+    # Señales faltantes Bomba B (2025-02-23) - Usando modelos de Bomba A como fallback
+    "vibracion_x_descanso_externo": "Vibracion_X_Descanso_Externo_Bomba_1A_A.pkl",  # Modelo Bomba A
+    "vibracion_y_descanso_externo": "Vibracion_Y_Descanso_Externo_Bomba_1A_B.pkl",  # Modelo Bomba A
+    "presion_succion_baa": "Presion_succion_BAA_AE01A.pkl",  # Modelo Bomba A
+    "posicion_valvula_recirc": "Posicion_v_lvula_recirc_BAA_AE01A.pkl",  # Modelo Bomba A
     "flujo_domo_ap_compensated": "Flujo_de_Agua_Alimentaci_n_Domo_AP_Compensated_B.pkl",
-    "mw_brutos_generacion_gas": "model_MW_brutos.pkl",
+    "mw_brutos_generacion_gas": "Medicion_de_Pot_Bruta_Planta_B.pkl",
     "presion_agua_econ_ap": "Presi_n_Agua_Alimentacion_Econ._AP.pkl",
 }
 
@@ -204,13 +204,24 @@ class ModelRegistry:
         """Obtiene un modelo, cargándolo si es necesario"""
         if model_key not in MODEL_PATHS:
             raise KeyError(f"Modelo no reconocido: {model_key}")
-        
+
+        # Si el modelo está definido como None, retornar None
+        if MODEL_PATHS[model_key] is None:
+            logger.warning(f"Modelo {model_key} no disponible (definido como None)")
+            return None
+
         # Cargar el modelo si aún no está en memoria
         if model_key not in cls._models:
             start_time = time.time()
             logger.info(f"Cargando modelo {model_key}...")
-            
+
             model_path = os.path.join(MODELS_DIR, MODEL_PATHS[model_key])
+
+            # Verificar si el archivo existe
+            if not os.path.exists(model_path):
+                logger.error(f"Archivo de modelo no encontrado: {model_path}")
+                return None
+
             cls._models[model_key] = joblib.load(model_path)
             
             load_time = time.time() - start_time
@@ -376,7 +387,60 @@ UMBRAL_SENSORES = {
         "umbral_minimo": 3,
         "umbral_alerta": 8,
         "umbral_critica": 15,
-    }
+    },
+    # Temperaturas descanso Bomba B (corregidas 2025-02-23)
+    'prediccion_temp_descanso_bomba': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_temp_descanso_empuje': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_temp_descanso_motor': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    # Vibraciones externas (nuevas 2025-02-23)
+    'prediccion_vibracion_x_descanso_externo': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_vibracion_y_descanso_externo': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    # Nuevos sensores (2025-02-23)
+    'prediccion_presion_succion_baa': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_posicion_valvula_recirc': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_flujo_domo_ap_compensated': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_mw_brutos_generacion_gas': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
+    'prediccion_presion_agua_econ_ap': {
+        "umbral_minimo": 3,
+        "umbral_alerta": 8,
+        "umbral_critica": 15,
+    },
 }
 
 def predecir_sensores_np(modelo, valor):
@@ -885,7 +949,20 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
     Si no, busca por tiempo_sensor o crea uno nuevo.
     """
     try:
-        clase = predecir_sensores_np(modelos[modelo_key], sensor.valor)
+        # Verificar si el modelo está disponible
+        modelo = modelos.get(modelo_key)
+        if modelo is None:
+            logger.warning(f"Modelo {modelo_key} no disponible. Datos guardados sin clasificación.")
+            # Retornar respuesta indicando que no hay modelo
+            return {
+                "clasificacion": None,
+                "descripcion": "Sin modelo ML disponible",
+                "mensaje": f"Sensor {model_class.__tablename__}: datos recibidos pero modelo {modelo_key} no disponible",
+                "valor": sensor.valor,
+                "id_sensor": sensor.id_sensor
+            }
+
+        clase = predecir_sensores_np(modelo, sensor.valor)
         descripcion = "Normal" if clase == 1 else "Anomalía"
 
         # Obtener último registro para conocer el contador previo
