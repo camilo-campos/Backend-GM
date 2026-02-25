@@ -153,24 +153,6 @@ MAPEO_SENSORES_B = {
 router = APIRouter(prefix="/alertas_umbral", tags=["Alertas"])
 
 
-def _verificar_datos_disponibles(db: Session, modelo_sensor, timestamp_inicio, timestamp_fin) -> bool:
-    """
-    Verifica si existen datos del sensor en el rango de tiempo especificado.
-    Retorna True si hay al menos un registro, False si no hay datos.
-    """
-    if not modelo_sensor or not timestamp_inicio or not timestamp_fin:
-        return False
-
-    try:
-        count = db.query(modelo_sensor).filter(
-            modelo_sensor.tiempo_ejecucion >= timestamp_inicio,
-            modelo_sensor.tiempo_ejecucion <= timestamp_fin
-        ).limit(1).count()
-        return count > 0
-    except Exception:
-        return False
-
-
 def _obtener_rango_datos_sensor(db: Session, modelo_sensor):
     """
     Obtiene el rango de fechas disponibles para un sensor.
@@ -230,17 +212,6 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
     alertas_formateadas = []
 
     for alerta in alertas_a:
-        # Verificar si hay datos disponibles para esta alerta
-        datos_disponibles = False
-        if alerta.timestamp_inicio_anomalia and alerta.timestamp_fin_anomalia:
-            modelo_sensor = MAPEO_SENSORES_A.get(alerta.tipo_sensor)
-            if modelo_sensor:
-                datos_disponibles = _verificar_datos_disponibles(
-                    db, modelo_sensor,
-                    alerta.timestamp_inicio_anomalia,
-                    alerta.timestamp_fin_anomalia
-                )
-
         alerta_dict = {
             "id": alerta.id,
             "sensor_id": alerta.sensor_id,
@@ -251,22 +222,11 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,
             "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None,
-            "datos_disponibles": datos_disponibles
+            "datos_disponibles": True
         }
         alertas_formateadas.append(alerta_dict)
 
     for alerta in alertas_b:
-        # Verificar si hay datos disponibles para esta alerta
-        datos_disponibles = False
-        if alerta.timestamp_inicio_anomalia and alerta.timestamp_fin_anomalia:
-            modelo_sensor = MAPEO_SENSORES_B.get(alerta.tipo_sensor)
-            if modelo_sensor:
-                datos_disponibles = _verificar_datos_disponibles(
-                    db, modelo_sensor,
-                    alerta.timestamp_inicio_anomalia,
-                    alerta.timestamp_fin_anomalia
-                )
-
         alerta_dict = {
             "id": alerta.id,
             "sensor_id": alerta.sensor_id,
@@ -277,7 +237,7 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,
             "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None,
-            "datos_disponibles": datos_disponibles
+            "datos_disponibles": True
         }
         alertas_formateadas.append(alerta_dict)
 

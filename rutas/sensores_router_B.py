@@ -158,6 +158,7 @@ CACHE_TIMEOUT = 30  # segundos - ajustar según necesidad
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Obtiene la ruta del archivo actual
 MODELS_DIR = os.path.join(BASE_DIR, "..", "modelos_prediccion_b")  # Ruta absoluta a la carpeta de modelos
+MODELS_DIR_FALLBACK = os.path.join(BASE_DIR, "..", "modelos_prediccion")  # Fallback: modelos de Bomba A
 
 # Mapa de claves de modelo a rutas de archivo
 MODEL_PATHS = {
@@ -217,17 +218,22 @@ class ModelRegistry:
 
             model_path = os.path.join(MODELS_DIR, MODEL_PATHS[model_key])
 
-            # Verificar si el archivo existe
+            # Si no existe en modelos_prediccion_b, buscar en modelos_prediccion (fallback Bomba A)
             if not os.path.exists(model_path):
-                logger.error(f"Archivo de modelo no encontrado: {model_path}")
-                return None
+                fallback_path = os.path.join(MODELS_DIR_FALLBACK, MODEL_PATHS[model_key])
+                if os.path.exists(fallback_path):
+                    logger.info(f"Modelo {model_key} no encontrado en Bomba B, usando fallback de Bomba A: {fallback_path}")
+                    model_path = fallback_path
+                else:
+                    logger.error(f"Archivo de modelo no encontrado en ninguna carpeta: {MODEL_PATHS[model_key]}")
+                    return None
 
             cls._models[model_key] = joblib.load(model_path)
-            
+
             load_time = time.time() - start_time
             cls._load_times[model_key] = load_time
             cls._access_count[model_key] = 0
-            
+
             logger.info(f"Modelo {model_key} cargado en {load_time:.4f} segundos")
         
         # Incrementar el contador de accesos

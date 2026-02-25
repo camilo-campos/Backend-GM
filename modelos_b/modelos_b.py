@@ -122,7 +122,7 @@ class SensorTemperaturaAmbiental(Base):
 
 
 class SensorTemperaturaAguaAlim(Base):
-    __tablename__ = 'temperatura_agua_alim_b'
+    __tablename__ = 'temperatura_agua_alim_ap_b'
     
     id = Column(Integer, primary_key=True, index=True)
     tiempo_ejecucion = Column(DateTime, default=func.now())  # Fecha y hora de ejecución
