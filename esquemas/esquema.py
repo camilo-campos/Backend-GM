@@ -27,7 +27,7 @@ class PrediccionBombaInput(BaseModel):
     voltaje_barra: float = Field(..., description="Voltaje Barra 6,6KV (V)")
     corriente_motor: float = Field(..., description="Corriente Motor Bomba Agua Alimentacion BFWP A (A)")
     vibracion_axial: float = Field(..., description="Vibración Axial Descanso Emp Bomba 1A (ms)")
-    salida_bomba: float = Field(..., description="Salida de Bomba de Alta Presión")
+    salida_bomba: Optional[float] = Field(default=0.0, description="Salida de Bomba de Alta Presión (sin sensor activo, usa 0.0 por defecto)")
     flujo_agua: float = Field(..., description="Flujo de Agua Atemperación Vapor Alta AP SH (kg/h)")
     mw_brutos_gas: float = Field(..., description="MW Brutos de Generación Total Gas (MW)")
     temp_motor: float = Field(..., description="Temperatura Descanso Interno Motor Bomba 1A (°C)")

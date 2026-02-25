@@ -357,6 +357,28 @@ class SensorFlujoDomoAPCompensated(Base):
     contador_anomalias = Column(Integer, default=0)
 
 
+class SensorFlujoDeAguaAtempVaporAltaAP(Base):
+    __tablename__ = 'flujo_de_agua_atemp_vapor_alta_ap'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
+class SensorPresionAguaAlimentacionEconAP(Base):
+    __tablename__ = 'presion_agua_alimentacion_econ_ap'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String)
+    valor_sensor = Column(Float)
+    clasificacion = Column(Integer, nullable=True)
+    contador_anomalias = Column(Integer, default=0)
+
+
 # ============================================
 # MODELOS BITÁCORAS GM CON CLASIFICACIÓN LLM
 # Actualizado: 2025-02-23
