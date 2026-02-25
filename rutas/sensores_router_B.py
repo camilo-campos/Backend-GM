@@ -201,6 +201,7 @@ MODEL_PATHS = {
     "presion_agua_econ_ap": "Presi_n_Agua_Alimentacion_Econ._AP.pkl",
     # Tabla compartida Bomba A - nueva ruta en Bomba B
     "flujo_atemp_vapor_alta_ap": "Flujo_de_Agua_Atemp_Vapor_Alta_AP_SH.pkl",  # Modelo Bomba A
+    "flujo_domo_ap_compensated": "Flujo_de_Agua_Alimentacion_Domo_AP_Compensated_18B.pkl",  # Misma tabla flujo_agua_domo_ap_b
 }
 
 class ModelRegistry:
@@ -333,6 +334,11 @@ UMBRAL_SENSORES = {
         "umbral_minimo": 39,    # 50% de 78
         "umbral_alerta": 62,    # 80% de 78
         "umbral_critica": 78,   # Flujo de Agua Alimentación Domo AP Compensated
+    },
+    'prediccion_flujo_domo_ap_compensated': {
+        "umbral_minimo": 39,
+        "umbral_alerta": 62,
+        "umbral_critica": 78,
     },
     'prediccion_flujo_agua_domo_mp': {
         "umbral_minimo": 22,    # 50% de 45
@@ -696,6 +702,15 @@ SENSOR_INFO = {
     'prediccion_flujo_agua_domo_ap': {
         'nombre': 'Flujo de agua domo AP',
         'descripcion': 'Nivel de flujo de agua en el domo de alta presión',
+        'acciones': {
+            'AVISO': 'Verificar condiciones de operación',
+            'ALERTA': 'Revisar sistema de control de flujo',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de falla en sistema de alta presión'
+        }
+    },
+    'prediccion_flujo_domo_ap_compensated': {
+        'nombre': 'Flujo Domo AP Compensado',
+        'descripcion': 'Flujo de agua alimentación domo AP compensado',
         'acciones': {
             'AVISO': 'Verificar condiciones de operación',
             'ALERTA': 'Revisar sistema de control de flujo',
@@ -1220,6 +1235,18 @@ Se evalúan las anomalías en una ventana de 8 horas:
 )
 async def predecir_flujo_agua_domo_ap(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_domo_ap", umbral_key="prediccion_flujo_agua_domo_ap", model_class=SensorFlujoAguaDomoAP)
+
+@router_b.post(
+    "/prediccion_flujo_domo_ap_compensated",
+    summary="Detectar anomalía - Flujo domo AP compensado",
+    description="""
+Analiza el flujo de agua alimentación domo AP compensado de la Bomba B.
+Usa la misma tabla flujo_agua_domo_ap_b.
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
+async def predecir_flujo_domo_ap_compensated(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_domo_ap_compensated", umbral_key="prediccion_flujo_domo_ap_compensated", model_class=SensorFlujoAguaDomoAP)
 
 @router_b.post(
     "/prediccion_flujo_agua_domo_mp",
@@ -1857,6 +1884,20 @@ Lista de registros con:
     response_description="Lista de registros históricos del sensor de flujo domo AP"
 )
 async def get_sensores_flujo_agua_domo_ap(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoAguaDomoAP, "flujo_agua_domo_ap", DEFAULT_SENSORES_FLUJO_AGUA_DOMO_AP, inicio, termino, limite)
+
+@router_b.get(
+    "/flujo_domo_ap_compensated",
+    summary="Histórico - Flujo domo AP compensado",
+    description="Obtiene registros históricos del flujo de agua alimentación domo AP compensado. Usa la misma tabla flujo_agua_domo_ap_b.",
+    response_description="Lista de registros históricos"
+)
+async def get_sensores_flujo_domo_ap_compensated(
     inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
     termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
     limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),

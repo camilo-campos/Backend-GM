@@ -14,7 +14,8 @@ from modelos.modelos import (SensorCorriente, SensorPresionAgua, SensorMw_brutos
                           SensorExcentricidadBomba,
                           SensorFlujoAguaRecalentador, SensorFlujoAguaVaporAlta, SensorPosicionValvulaRecirc,
                           SensorPresionSuccionBAA, SensorTemperaturaEstator, SensorFlujoSalida12FPMFC,
-                          SensorFlujoDeAguaAtempVaporAltaAP, SensorPresionAguaAlimentacionEconAP)
+                          SensorFlujoDeAguaAtempVaporAltaAP, SensorPresionAguaAlimentacionEconAP,
+                          SensorFlujoDomoAPCompensated)
 # Importar tabla compartida flujo_agua_domo_ap_b (usada por ambas bombas)
 from modelos_b.modelos_b import SensorFlujoAguaDomoAP as SensorFlujoAguaDomoAPCompartido
 # Importar tablas de Bomba B redirigidas a Bomba A (tablas compartidas)
@@ -105,6 +106,7 @@ MODEL_PATHS = {
     # Modelos adicionales
     "excentricidad_bomba": "Excentricidad_Bomba_1A.pkl",
     "flujo_agua_domo_ap": "Flujo_de_Agua_Alimentacion_Domo_AP_Compensated_18B.pkl",
+    "flujo_domo_ap_compensated": "Flujo_de_Agua_Alimentaci_n_Domo_AP_Compensated_B.pkl",
     "flujo_agua_domo_mp": "Flujo_de_Agua_Alimentacion_Domo_MP_Compensated_16B.pkl",
     "flujo_agua_recalentador": "Flujo_de_Agua_Atemp_Recale_Calient_RH.pkl",
     "flujo_agua_vapor_alta": "Flujo_de_Agua_Atemp_Vapor_Alta_AP_SH.pkl",
@@ -275,6 +277,11 @@ UMBRAL_SENSORES = {
     'prediccion_flujo-agua-domo-ap': {
         "umbral_minimo": 39,    # 50% de 78
         "umbral_alerta": 62,    # 80% de 78
+        "umbral_critica": 78,
+    },
+    'prediccion_flujo-domo-ap-compensated': {
+        "umbral_minimo": 39,
+        "umbral_alerta": 62,
         "umbral_critica": 78,
     },
     'prediccion_flujo-agua-domo-mp': {
@@ -653,6 +660,15 @@ SENSOR_INFO = {
     'prediccion_flujo-agua-domo-ap': {
         'nombre': 'Flujo de Agua Domo AP',
         'descripcion': 'Flujo de agua de alimentación al domo de alta presión',
+        'acciones': {
+            'AVISO': 'Verificar sistema de control de flujo y válvulas',
+            'ALERTA': 'Revisar posibles obstrucciones o fallos en bombas de alimentación',
+            'CRÍTICA': 'Intervención inmediata: Riesgo de sobrecalentamiento en domo AP'
+        }
+    },
+    'prediccion_flujo-domo-ap-compensated': {
+        'nombre': 'Flujo Domo AP Compensado',
+        'descripcion': 'Flujo de agua alimentación domo AP compensado',
         'acciones': {
             'AVISO': 'Verificar sistema de control de flujo y válvulas',
             'ALERTA': 'Revisar posibles obstrucciones o fallos en bombas de alimentación',
@@ -1527,6 +1543,26 @@ async def predecir_flujo_agua_domo_ap(sensor: SensorInput, db: Session = Depends
     return procesar(sensor, db, modelo_key="flujo_agua_domo_ap", umbral_key="prediccion_flujo-agua-domo-ap", model_class=SensorFlujoAguaDomoAPCompartido)
 
 @router.post(
+    "/prediccion_flujo-domo-ap-compensated",
+    summary="Detectar anomalía - Flujo domo AP compensado",
+    description="""
+Analiza el flujo de agua alimentación domo AP compensado.
+
+**Modelo:** Isolation Forest (detección de outliers)
+
+**Entrada:**
+- `valor_sensor`: Valor numérico de flujo (kg/h)
+
+**Respuesta:**
+- `clasificacion`: 1 (normal) o -1 (anomalía)
+- `alerta`: Información de alerta si se supera algún umbral
+    """,
+    response_description="Resultado de la predicción con clasificación y estado de alertas"
+)
+async def predecir_flujo_domo_ap_compensated(sensor: SensorInput, db: Session = Depends(get_db)):
+    return procesar(sensor, db, modelo_key="flujo_domo_ap_compensated", umbral_key="prediccion_flujo-domo-ap-compensated", model_class=SensorFlujoAguaDomoAPCompartido)
+
+@router.post(
     "/prediccion_flujo-agua-domo-mp",
     summary="Detectar anomalía - Flujo agua domo MP",
     description="""
@@ -2130,6 +2166,30 @@ async def get_sensores_flujo_agua_domo_ap(
     return await _get_and_classify(db, SensorFlujoAguaDomoAPCompartido, "flujo_agua_domo_ap", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
 
 @router.get(
+    "/flujo-domo-ap-compensated",
+    summary="Histórico - Flujo domo AP compensado",
+    description="""
+Obtiene registros históricos del flujo de agua alimentación domo AP compensado.
+
+**Parámetros de filtrado:**
+- `inicio`: Fecha/hora de inicio (ISO 8601)
+- `termino`: Fecha/hora de fin (ISO 8601)
+- `limite`: Cantidad máxima de registros (10-500, default: 40)
+
+**Respuesta:**
+Lista de registros con valor, clasificación (1=normal, -1=anomalía) y timestamps.
+    """,
+    response_description="Lista de registros históricos de flujo domo AP compensado"
+)
+async def get_sensores_flujo_domo_ap_compensated(
+    inicio: Optional[str] = Query(None, description="Fecha inicio (ISO 8601)"),
+    termino: Optional[str] = Query(None, description="Fecha fin (ISO 8601)"),
+    limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
+    db: Session = Depends(get_db)
+):
+    return await _get_and_classify(db, SensorFlujoAguaDomoAPCompartido, "flujo_agua_domo_ap", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+
+@router.get(
     "/flujo-agua-domo-mp",
     summary="Histórico - Flujo agua domo MP",
     description="""
@@ -2685,4 +2745,4 @@ async def get_sensores_presion_agua_econ_ap_alias(
     limite: int = Query(40, description="Cantidad de registros (10-500)", ge=10, le=500),
     db: Session = Depends(get_db)
 ):
-    return await _get_and_classify(db, SensorPresionAgua, "presion_agua", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
+    return await _get_and_classify(db, SensorPresionAguaAlimentacionEconAP, "presion_agua_alimentacion_econ_ap", DEFAULT_SENSORES_PRESION_AGUA, inicio, termino, limite)
