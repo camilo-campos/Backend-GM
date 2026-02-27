@@ -1035,8 +1035,12 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             prev_n = nivel_numerico(prev.descripcion) if prev else 0
             curr_n = nivel_numerico(alerta_info["nivel"])
 
-            es_nuevo_ciclo_critica = (curr_n == 3 and prev_n == 3)
-            debe_crear_alerta = (curr_n > prev_n) or es_nuevo_ciclo_critica
+            # Detectar reset: si el conteo actual es menor que el de la última alerta,
+            # hubo un reset por CRÍTICA, tratar como nuevo ciclo
+            if prev and prev.contador_anomalias and conteo_ventana < prev.contador_anomalias:
+                prev_n = 0
+
+            debe_crear_alerta = curr_n > prev_n
 
             if debe_crear_alerta:
                 inicio_anomalia = info_anomalias.get('primera_anomalia')
@@ -1064,6 +1068,18 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 db.add(alerta)
                 db.commit()
                 logger.info(f"[{umbral_key}] Nueva alerta {alerta_info['nivel']} (conteo={conteo_ventana})")
+
+                # Si se alcanzó CRÍTICA, resetear el ciclo:
+                # Marcar anomalías de la ventana como procesadas (clasificacion=-2)
+                # para que el contador vuelva a 0 en el siguiente insert
+                if curr_n == 3:
+                    tiempo_reset = datetime.now() - timedelta(hours=VENTANA_HORAS)
+                    resetados = db.query(model_class).filter(
+                        model_class.clasificacion == -1,
+                        model_class.tiempo_ejecucion >= tiempo_reset
+                    ).update({'clasificacion': -2}, synchronize_session=False)
+                    db.commit()
+                    logger.info(f"[{umbral_key}] CRÍTICA alcanzada: {resetados} anomalías marcadas como procesadas, contador reseteado")
 
     return {
         "id_registro": lectura.id,

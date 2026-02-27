@@ -16,8 +16,8 @@ parameters = {
   "min_new_tokens": 0,
   "repetition_penalty": 1
 }
-proyecto_id=os.getenv("project_id")
-api_key=os.getenv("apikey")
+proyecto_id=os.getenv("WATSONX_PROJECT_ID") or os.getenv("project_id")
+api_key=os.getenv("WATSONX_APIKEY") or os.getenv("apikey")
 #print(proyecto_id)
 #print(api_key)
 #meta-llama/llama-3-3-70b-instruct
