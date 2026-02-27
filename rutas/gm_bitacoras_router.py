@@ -24,99 +24,30 @@ class ClasificarBitacoraInput(BaseModel):
 # FUNCIONES AUXILIARES
 # ============================================
 
-async def _get_and_classify_gm_bitacoras_a(db: Session):
+def _get_gm_bitacoras_a(db: Session):
     """
-    Obtiene todas las bitacoras de gm_bitacoras_a, clasifica las pendientes
-    y retorna la lista completa.
+    Obtiene todas las bitacoras de gm_bitacoras_a.
+    La clasificacion se realiza via POST /clasificar (listener) o POST /clasificar-pendientes.
     """
     bitacoras = (
         db.query(GmBitacoraA)
           .order_by(GmBitacoraA.id.desc())
           .all()
     )
-
-    if not bitacoras:
-        return []
-
-    # Si WatsonX no esta disponible, solo retornar las bitacoras sin clasificar
-    if llm_chain is None:
-        return bitacoras
-
-    # Filtrar sin clasificacion
-    no_clasificadas = [b for b in bitacoras if b.clasificacion is None]
-    if no_clasificadas:
-        for b in no_clasificadas:
-            primer_analisis = llm_chain.invoke({"bitacora": b.bitacora}).strip()
-            # Si detecta fallo especifico
-            if "HRSG Pump Failures" in primer_analisis:
-                segundo_analisis = llm_chain_2.invoke({"bitacora": b.bitacora}).strip()
-                b.clasificacion = primer_analisis
-                b.alerta_aviso = segundo_analisis
-            else:
-                b.clasificacion = primer_analisis
-
-            db.add(b)
-
-        db.commit()
-
-        # Traducir clasificaciones
-        for b in no_clasificadas:
-            db.refresh(b)
-
-            if b.clasificacion:
-                clasificacion_original = b.clasificacion
-                b.clasificacion = traducir_clasificacion(clasificacion_original)
-                if b.clasificacion != clasificacion_original:
-                    db.add(b)
-
-        db.commit()
-
-    return bitacoras
+    return bitacoras or []
 
 
-async def _get_and_classify_gm_bitacoras_b(db: Session):
+def _get_gm_bitacoras_b(db: Session):
     """
-    Obtiene todas las bitacoras de gm_bitacoras_b, clasifica las pendientes
-    y retorna la lista completa.
+    Obtiene todas las bitacoras de gm_bitacoras_b.
+    La clasificacion se realiza via POST /clasificar (listener) o POST /clasificar-pendientes.
     """
     bitacoras = (
         db.query(GmBitacoraB)
           .order_by(GmBitacoraB.id.desc())
           .all()
     )
-
-    if not bitacoras:
-        return []
-
-    if llm_chain is None:
-        return bitacoras
-
-    no_clasificadas = [b for b in bitacoras if b.clasificacion is None]
-    if no_clasificadas:
-        for b in no_clasificadas:
-            primer_analisis = llm_chain.invoke({"bitacora": b.bitacora}).strip()
-            if "HRSG Pump Failures" in primer_analisis:
-                segundo_analisis = llm_chain_2.invoke({"bitacora": b.bitacora}).strip()
-                b.clasificacion = primer_analisis
-                b.alerta_aviso = segundo_analisis
-            else:
-                b.clasificacion = primer_analisis
-
-            db.add(b)
-
-        db.commit()
-
-        for b in no_clasificadas:
-            db.refresh(b)
-            if b.clasificacion:
-                clasificacion_original = b.clasificacion
-                b.clasificacion = traducir_clasificacion(clasificacion_original)
-                if b.clasificacion != clasificacion_original:
-                    db.add(b)
-
-        db.commit()
-
-    return bitacoras
+    return bitacoras or []
 
 
 # ============================================
@@ -143,7 +74,7 @@ Obtiene todas las bitacoras de gm_bitacoras_a con clasificacion automatica.
 )
 async def get_todas_gm_bitacoras(db: Session = Depends(get_db)):
     try:
-        bitacoras = await _get_and_classify_gm_bitacoras_a(db)
+        bitacoras = _get_gm_bitacoras_a(db)
         return {"message": "Consulta exitosa", "data": bitacoras}
     except Exception as e:
         print("Error:", e)
@@ -165,7 +96,7 @@ Solo retorna bitacoras cuya clasificacion contiene:
 )
 async def get_todas_gm_bitacoras_fallas(db: Session = Depends(get_db)):
     try:
-        bitacoras = await _get_and_classify_gm_bitacoras_a(db)
+        bitacoras = _get_gm_bitacoras_a(db)
         fallas = [b for b in bitacoras if b.clasificacion and (
             "HRSG Pump Failures" in b.clasificacion or
             "Fallas de Bomba HRSG" in b.clasificacion or
@@ -189,7 +120,7 @@ async def get_todas_gm_bitacoras_fallas(db: Session = Depends(get_db)):
 )
 async def get_todas_gm_bitacoras_b(db: Session = Depends(get_db)):
     try:
-        bitacoras = await _get_and_classify_gm_bitacoras_b(db)
+        bitacoras = _get_gm_bitacoras_b(db)
         return {"message": "Consulta exitosa", "data": bitacoras}
     except Exception as e:
         print("Error:", e)
@@ -204,7 +135,7 @@ async def get_todas_gm_bitacoras_b(db: Session = Depends(get_db)):
 )
 async def get_todas_gm_bitacoras_fallas_b(db: Session = Depends(get_db)):
     try:
-        bitacoras = await _get_and_classify_gm_bitacoras_b(db)
+        bitacoras = _get_gm_bitacoras_b(db)
         fallas = [b for b in bitacoras if b.clasificacion and (
             "HRSG Pump Failures" in b.clasificacion or
             "Fallas de Bomba HRSG" in b.clasificacion or
