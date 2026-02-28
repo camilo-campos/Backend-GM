@@ -89,7 +89,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "modelos_prediccion")  # Ruta absoluta
 MODEL_PATHS = {
     # Modelos originales actualizados
     "corriente_motor": "Corriente_MTR_BBA_Agua_Alim_1A.pkl",
-    "mw_brutos_gas": "Medicion_de_Pot_Bruta_Planta.pkl",
+    "mw_brutos_gas": "model_MW_brutos.pkl",
     "presion_agua": "Presi_n_Agua_Alimentacion_Econ._AP.pkl",
     "temperatura_ambiental": "Temp_Ambiental.pkl",
     # Temperatura descanso (usando modelos disponibles)
@@ -213,6 +213,8 @@ def predecir_sensores_optimizado(modelo_key, valor_tuple):
     Versión optimizada con caché para predecir valores (debe recibir valores como tuplas)
     """
     modelo = ModelRegistry.get_model(modelo_key)
+    if modelo is None:
+        raise ValueError(f"Modelo '{modelo_key}' no se pudo cargar")
     X = pd.DataFrame([valor_tuple], columns=["valor"])
     return modelo.predict(X.values)[0]
 
@@ -898,7 +900,16 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             }
 
         # ── PASO 1: Clasificar el valor del sensor ──
-        clase = predecir_sensores_np(modelos[modelo_key], sensor.valor)
+        modelo = modelos[modelo_key]
+        if modelo is None:
+            logger.error(f"Modelo '{modelo_key}' no se pudo cargar (archivo no encontrado o corrupto)")
+            return {
+                "error": "Modelo no disponible",
+                "mensaje": f"El modelo '{modelo_key}' no se pudo cargar. Verificar que el archivo .pkl existe.",
+                "valor_sensor": sensor.valor,
+                "clasificacion": None
+            }
+        clase = predecir_sensores_np(modelo, sensor.valor)
         descripcion = "Normal" if clase == 1 else "Anomalía"
         tiempo_actual = datetime.now()
 
