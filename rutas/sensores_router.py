@@ -932,13 +932,16 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             sensor_dt = tiempo_actual
 
         # ── PASO 2: Contar anomalías en ventana de 8 horas ──
-        tiempo_inicio = tiempo_actual - timedelta(hours=VENTANA_HORAS)
+        # Usar sensor_dt como base de la ventana (no datetime.now())
+        # para que coincida con los timestamps reales de los datos en BD
+        tiempo_base_ventana = sensor_dt or tiempo_actual
+        tiempo_inicio = tiempo_base_ventana - timedelta(hours=VENTANA_HORAS)
         try:
             conteo_ventana = db.query(func.count(model_class.id)).filter(
                 model_class.clasificacion == -1,
                 model_class.tiempo_ejecucion.isnot(None),
                 model_class.tiempo_ejecucion >= tiempo_inicio,
-                model_class.tiempo_ejecucion <= tiempo_actual
+                model_class.tiempo_ejecucion <= tiempo_base_ventana
             ).scalar() or 0
         except Exception as e:
             logger.error(f"Error en COUNT ventana 8h: {e}")
