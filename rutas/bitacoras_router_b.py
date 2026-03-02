@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from modelos.database import get_db
-from modelos.modelos import BitacoraB
+from modelos.modelos import GmBitacoraB
 from esquemas.esquema import BitacoraInput
 from langchain_llm.analisis import llm_chain, llm_chain_2
 from utils.traduccion_bitacoras import verificar_y_traducir_bitacora
@@ -15,8 +15,8 @@ async def _get_and_classify_bitacoras(db: Session):
     si está nula, y retorna la lista completa.
     """
     bitacoras = (
-        db.query(BitacoraB)
-          .order_by(BitacoraB.id.desc())
+        db.query(GmBitacoraB)
+          .order_by(GmBitacoraB.id.desc())
           .limit(40)
           .all()
     )
@@ -87,7 +87,7 @@ Analiza el contenido de una bitácora de la Bomba B utilizando un modelo de leng
 async def predecir_corriente(bitacora: BitacoraInput, db: Session = Depends(get_db)):
     try:
         primer_analisis = llm_chain.invoke({"bitacora": bitacora.bitacora}).strip()
-        bitacora_db = db.query(BitacoraB).filter(BitacoraB.id == bitacora.id_bitacora).first()
+        bitacora_db = db.query(GmBitacoraB).filter(GmBitacoraB.id == bitacora.id_bitacora).first()
         if not bitacora_db:
             raise HTTPException(status_code=404, detail="Bitacora no encontrada.")
 
