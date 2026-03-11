@@ -20,7 +20,8 @@ from modelos.modelos import (
     SensorVibracionXDescansoInterno, SensorVibracionYDescansoInterno,
     # Sensores adicionales Bomba A
     SensorTemperaturaEstatorC, SensorFlujoDescarga,
-    SensorTemperaturaAguaAlimDomoMP, SensorFlujoDomoAPCompensated
+    SensorTemperaturaAguaAlimDomoMP, SensorFlujoDomoAPCompensated,
+    SensorPresionAguaAlimentacionEconAP
 )
 from modelos_b.modelos_b import (
     Alerta as AlertaB,
@@ -148,6 +149,44 @@ MAPEO_SENSORES_B = {
     "prediccion_mw_brutos_gas": SensorMwBrutosGeneracionGasB,
     "prediccion_presion_agua_econ_ap": SensorPresionAguaEconAPB,
 }
+
+# Equivalencias bidireccionales entre sensores Bomba A <-> Bomba B
+# Si la tabla principal no tiene datos, se busca en la tabla equivalente
+_PARES_SENSORES = [
+    (SensorCorriente, SensorCorrienteB),
+    (SensorExcentricidadBomba, SensorExcentricidadBombaB),
+    (SensorFlujoDescarga, SensorFlujoDescargaB),
+    (SensorFlujoAguaDomoAP, SensorFlujoAguaDomoAPB),
+    (SensorFlujoAguaDomoMP, SensorFlujoAguaDomoMPB),
+    (SensorFlujoAguaRecalentador, SensorFlujoAguaRecalentadorB),
+    (SensorFlujoAguaVaporAlta, SensorFlujoAguaVaporAltaB),
+    (SensorPresionAgua, SensorPresionAguaB),
+    (SensorTemperatura_Ambiental, SensorTemperaturaAmbientalB),
+    (SensorTemperaturaAguaAlimDomoMP, SensorTemperaturaAguaAlimB),
+    (SensorTemperaturaEstator, SensorTemperaturaEstatorB),
+    (SensorVibracion_axial_descanso, SensorVibracionAxialEmpujeB),
+    (SensorVibracionXDescansoInterno, SensorVibracionXDescansoB),
+    (SensorVibracionYDescansoInterno, SensorVibracionYDescansoB),
+    (SensorVoltaje_barra, SensorVoltajeBarraB),
+    (SensorTemperatura_descanso_interno_bomba_1a, SensorTemperaturaDescansoInternoBombaB),
+    (SensorTemperatura_descanso_interna_empuje_bomba_1aa, SensorTemperaturaDescansoInternaEmpujeBombaB),
+    (SensorTemperatura_descanso_interna_motor_bomba_1a, SensorTemperaturaDescansoInternaMotorBombaB),
+    (SensorVibracionXDescansoExterno, SensorVibracionXDescansoExternoB),
+    (SensorVibracionYDescansoExterno, SensorVibracionYDescansoExternoB),
+    (SensorPresionSuccionBAA, SensorPresionSuccionBAAB),
+    (SensorPosicionValvulaRecirc, SensorPosicionValvulaRecircB),
+    (SensorFlujoDomoAPCompensated, SensorFlujoDomoAPCompensatedB),
+    (SensorMw_brutos_generacion_gas, SensorMwBrutosGeneracionGasB),
+    (SensorPresionAguaAlimentacionEconAP, SensorPresionAguaEconAPB),
+    (SensorSalidaAgua, SensorPresionAguaB),
+    (SensorPresionAguaMP, SensorPresionAguaB),
+]
+
+# Generar diccionario bidireccional: A->B y B->A
+EQUIVALENCIA_SENSORES = {}
+for sensor_a, sensor_b in _PARES_SENSORES:
+    EQUIVALENCIA_SENSORES[sensor_a] = sensor_b
+    EQUIVALENCIA_SENSORES[sensor_b] = sensor_a
 
 
 router = APIRouter(prefix="/alertas_umbral", tags=["Alertas"])
@@ -325,11 +364,20 @@ def _buscar_alerta(db: Session, alerta_id: int, bomba: str = None):
 
 
 def _obtener_datos_sensor(db: Session, modelo_sensor, timestamp_inicio, timestamp_fin):
-    """Obtiene los datos del sensor en el rango temporal especificado"""
+    """Obtiene los datos del sensor en el rango temporal especificado.
+    Si la tabla no tiene datos, intenta con la tabla equivalente (A<->B)."""
     registros = db.query(modelo_sensor).filter(
         modelo_sensor.tiempo_ejecucion >= timestamp_inicio,
         modelo_sensor.tiempo_ejecucion <= timestamp_fin
     ).order_by(modelo_sensor.tiempo_ejecucion.asc()).all()
+
+    # Fallback bidireccional: si no hay datos, buscar en la tabla equivalente
+    if not registros and modelo_sensor in EQUIVALENCIA_SENSORES:
+        modelo_fallback = EQUIVALENCIA_SENSORES[modelo_sensor]
+        registros = db.query(modelo_fallback).filter(
+            modelo_fallback.tiempo_ejecucion >= timestamp_inicio,
+            modelo_fallback.tiempo_ejecucion <= timestamp_fin
+        ).order_by(modelo_fallback.tiempo_ejecucion.asc()).all()
 
     return registros
 

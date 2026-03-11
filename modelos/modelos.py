@@ -412,6 +412,15 @@ class GmBitacoraA(Base):
     resumen_llm = Column(Text, nullable=True)
 
 
+class BombaActiva(Base):
+    __tablename__ = 'bomba_activa'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tiempo_ejecucion = Column(DateTime, default=func.now())
+    tiempo_sensor = Column(String, nullable=True)
+    bomba_activa = Column(String(3), nullable=True)
+
+
 class GmBitacoraB(Base):
     """Bitácoras de operación Bomba B - Compatible con frontend"""
     __tablename__ = 'gm_bitacoras_b'
