@@ -21,7 +21,8 @@ from modelos.modelos import (
     # Sensores adicionales Bomba A
     SensorTemperaturaEstatorC, SensorFlujoDescarga,
     SensorTemperaturaAguaAlimDomoMP, SensorFlujoDomoAPCompensated,
-    SensorPresionAguaAlimentacionEconAP
+    SensorPresionAguaAlimentacionEconAP,
+    SensorFlujoDeAguaAtempVaporAltaAP,
 )
 from modelos_b.modelos_b import (
     Alerta as AlertaB,
@@ -131,6 +132,7 @@ MAPEO_SENSORES_B = {
     # Sensores adicionales Bomba B
     "prediccion_temperatura_descanso_interno": SensorTemperaturaDescansoInternoBombaB,
     "prediccion_temp_descanso_interno": SensorTemperaturaDescansoInternoBombaB,
+    "prediccion_temp_descanso_bomba": SensorTemperaturaDescansoInternoBombaB,
     "prediccion_temperatura_descanso_empuje": SensorTemperaturaDescansoInternaEmpujeBombaB,
     "prediccion_temp_descanso_empuje": SensorTemperaturaDescansoInternaEmpujeBombaB,
     "prediccion_temperatura_descanso_motor": SensorTemperaturaDescansoInternaMotorBombaB,
@@ -147,7 +149,10 @@ MAPEO_SENSORES_B = {
     "prediccion_flujo_agua_domo_ap_compensated": SensorFlujoDomoAPCompensatedB,
     "prediccion_mw_brutos": SensorMwBrutosGeneracionGasB,
     "prediccion_mw_brutos_gas": SensorMwBrutosGeneracionGasB,
+    "prediccion_mw_brutos_generacion_gas": SensorMwBrutosGeneracionGasB,
     "prediccion_presion_agua_econ_ap": SensorPresionAguaEconAPB,
+    # Sensor compartido (tabla de Bomba A) usado por el endpoint B
+    "prediccion_flujo_atemp_vapor_alta_ap": SensorFlujoDeAguaAtempVaporAltaAP,
 }
 
 # Equivalencias bidireccionales entre sensores Bomba A <-> Bomba B
