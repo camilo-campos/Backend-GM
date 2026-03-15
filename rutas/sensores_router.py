@@ -15,7 +15,7 @@ from modelos.modelos import (SensorCorriente, SensorPresionAgua, SensorMw_brutos
                           SensorFlujoAguaRecalentador, SensorFlujoAguaVaporAlta, SensorPosicionValvulaRecirc,
                           SensorPresionSuccionBAA, SensorTemperaturaEstator, SensorFlujoSalida12FPMFC,
                           SensorFlujoDeAguaAtempVaporAltaAP, SensorPresionAguaAlimentacionEconAP,
-                          SensorFlujoDomoAPCompensated)
+                          SensorFlujoDomoAPCompensated, BombaActiva)
 # Importar tabla compartida flujo_agua_domo_ap_b (usada por ambas bombas)
 from modelos_b.modelos_b import SensorFlujoAguaDomoAP as SensorFlujoAguaDomoAPCompartido
 # Importar tablas de Bomba B redirigidas a Bomba A (tablas compartidas)
@@ -1039,7 +1039,10 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
     if clase == -1 and conteo_ventana > 0:
         info_para_alerta = dict(info_anomalias)
         info_para_alerta['conteo'] = conteo_ventana
-        alerta_info = determinar_alerta(info_para_alerta, umbral_key, "A")
+        # Consultar bomba activa actual
+        bomba_reg = db.query(BombaActiva).order_by(BombaActiva.id.desc()).first()
+        bomba_activa_id = bomba_reg.bomba_activa if bomba_reg else "A"
+        alerta_info = determinar_alerta(info_para_alerta, umbral_key, bomba_activa_id)
         if alerta_info:
             prev = db.query(Alerta) \
                      .filter(Alerta.tipo_sensor == umbral_key) \
@@ -1065,7 +1068,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                     intervalo = "No disponible"
 
                 mensaje = f"{alerta_info['nivel']}: {alerta_info['nombre_sensor']}\n"
-                mensaje += f"Bomba: A\n"
+                mensaje += f"Bomba: {bomba_activa_id}\n"
                 mensaje += f"Descripción: {alerta_info['descripcion_sensor']}\n"
                 mensaje += f"Intervalo: {intervalo}\n"
                 mensaje += f"Acción recomendada: {alerta_info['accion_recomendada']}"

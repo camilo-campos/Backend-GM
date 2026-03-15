@@ -23,6 +23,7 @@ from modelos.modelos import (
     SensorTemperaturaAguaAlimDomoMP, SensorFlujoDomoAPCompensated,
     SensorPresionAguaAlimentacionEconAP,
     SensorFlujoDeAguaAtempVaporAltaAP,
+    BombaActiva,
 )
 from modelos_b.modelos_b import (
     Alerta as AlertaB,
@@ -216,6 +217,59 @@ def _obtener_rango_datos_sensor(db: Session, modelo_sensor):
         return None, None
 
 
+def _obtener_bomba_activa_actual(db: Session):
+    """Obtiene el último valor de bomba_activa."""
+    registro = (
+        db.query(BombaActiva)
+        .order_by(BombaActiva.id.desc())
+        .first()
+    )
+    return registro.bomba_activa if registro else None
+
+
+def _formato_origen(bomba_activa_valor, tabla_origen):
+    """
+    Determina el texto de origen dinámico basado en la bomba activa.
+    tabla_origen: 'A' o 'B' (de qué tabla viene la alerta)
+    bomba_activa_valor: 'A', 'B', 'A/B' u 'O'
+    """
+    if not bomba_activa_valor or bomba_activa_valor == "O":
+        return "Sin bomba activa"
+
+    if bomba_activa_valor == "A/B":
+        return f"Bomba {tabla_origen} (Ambas activas)"
+    else:
+        return f"Bomba {bomba_activa_valor}"
+
+
+def _reescribir_descripcion(descripcion, bomba_activa_valor):
+    """
+    Reemplaza las referencias a BOMBA A/B en la descripción
+    con la bomba activa actual.
+    """
+    if not descripcion or not bomba_activa_valor:
+        return descripcion
+
+    if bomba_activa_valor == "O":
+        bomba_texto = "SIN BOMBA ACTIVA"
+        bomba_texto_min = "Sin bomba activa"
+    elif bomba_activa_valor == "A/B":
+        bomba_texto = "BOMBA A/B"
+        bomba_texto_min = "A/B"
+    else:
+        bomba_texto = f"BOMBA {bomba_activa_valor}"
+        bomba_texto_min = bomba_activa_valor
+
+    # Reemplazar "- BOMBA A" o "- BOMBA B" en el título
+    descripcion = descripcion.replace("- BOMBA A", f"- {bomba_texto}")
+    descripcion = descripcion.replace("- BOMBA B", f"- {bomba_texto}")
+    # Reemplazar "Bomba: A" o "Bomba: B" en el cuerpo
+    descripcion = descripcion.replace("Bomba: A", f"Bomba: {bomba_texto_min}")
+    descripcion = descripcion.replace("Bomba: B", f"Bomba: {bomba_texto_min}")
+
+    return descripcion
+
+
 async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
     """
     Obtiene las alertas de los últimos N días de ambas bombas (A y B) y las combina en una sola lista
@@ -243,26 +297,31 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
           .order_by(AlertaB.id.desc())
           .all()
     )
-    
+
     # Combinar ambas listas
     todas_alertas = alertas_a + alertas_b
-    
+
     # Si no hay alertas, retornar lista vacía
     if not todas_alertas:
         return []
-    
-    # Ordenar la lista combinada por timestamp (las más recientes primero)
-    # Convertimos cada alerta a un diccionario y añadimos un campo 'origen' para identificar de qué bomba proviene
+
+    # Obtener la bomba activa actual (último registro)
+    bomba_activa_actual = _obtener_bomba_activa_actual(db)
+
+    # Convertimos cada alerta a un diccionario con origen dinámico
     alertas_formateadas = []
 
     for alerta in alertas_a:
+        origen = _formato_origen(bomba_activa_actual, "A")
         alerta_dict = {
             "id": alerta.id,
             "sensor_id": alerta.sensor_id,
             "tipo_sensor": alerta.tipo_sensor,
             "timestamp": alerta.timestamp,
-            "descripcion": alerta.descripcion,
-            "origen": "Bomba A",
+            "descripcion": _reescribir_descripcion(alerta.descripcion, bomba_activa_actual),
+            "origen": origen,
+            "bomba_activa": bomba_activa_actual,
+            "tabla_origen": "A",
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,
             "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None,
@@ -271,13 +330,16 @@ async def _get_and_classify_bitacoras(db: Session, dias: int = 2):
         alertas_formateadas.append(alerta_dict)
 
     for alerta in alertas_b:
+        origen = _formato_origen(bomba_activa_actual, "B")
         alerta_dict = {
             "id": alerta.id,
             "sensor_id": alerta.sensor_id,
             "tipo_sensor": alerta.tipo_sensor,
             "timestamp": alerta.timestamp,
-            "descripcion": alerta.descripcion,
-            "origen": "Bomba B",
+            "descripcion": _reescribir_descripcion(alerta.descripcion, bomba_activa_actual),
+            "origen": origen,
+            "bomba_activa": bomba_activa_actual,
+            "tabla_origen": "B",
             "timestamp_inicio_anomalia": alerta.timestamp_inicio_anomalia,
             "timestamp_fin_anomalia": alerta.timestamp_fin_anomalia,
             "tiene_datos_anomalia": alerta.timestamp_inicio_anomalia is not None,

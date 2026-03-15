@@ -36,8 +36,17 @@ async def get_bomba_activa(db: Session = Depends(get_db)):
                 "mensaje": "No hay registros de bomba activa"
             }
 
+        valor = ultimo.bomba_activa
+        if valor == "O":
+            estado = "Sin bomba activa"
+        elif valor == "A/B":
+            estado = "Ambas bombas activas"
+        else:
+            estado = f"Bomba {valor} activa"
+
         return {
-            "bomba_activa": ultimo.bomba_activa,
+            "bomba_activa": valor,
+            "estado": estado,
             "tiempo_ejecucion": ultimo.tiempo_ejecucion.isoformat() if ultimo.tiempo_ejecucion else None,
             "tiempo_sensor": ultimo.tiempo_sensor,
         }
