@@ -403,17 +403,25 @@ def _buscar_alerta(db: Session, alerta_id: int, bomba: str = None):
     Busca una alerta por ID. Si se especifica bomba, busca directamente en esa tabla.
     Si no se especifica, busca en ambas (primero B, luego A para evitar colisiones).
     """
-    # Si se especifica la bomba, buscar directamente en esa tabla
+    # Si se especifica la bomba, buscar primero en esa tabla, luego en la otra como fallback
     if bomba:
         bomba_upper = bomba.upper()
         if bomba_upper == "A":
             alerta = db.query(AlertaA).filter(AlertaA.id == alerta_id).first()
             if alerta:
                 return alerta, "A", MAPEO_SENSORES_A
+            # Fallback: buscar en Bomba B
+            alerta = db.query(AlertaB).filter(AlertaB.id == alerta_id).first()
+            if alerta:
+                return alerta, "B", MAPEO_SENSORES_B
         elif bomba_upper == "B":
             alerta = db.query(AlertaB).filter(AlertaB.id == alerta_id).first()
             if alerta:
                 return alerta, "B", MAPEO_SENSORES_B
+            # Fallback: buscar en Bomba A
+            alerta = db.query(AlertaA).filter(AlertaA.id == alerta_id).first()
+            if alerta:
+                return alerta, "A", MAPEO_SENSORES_A
         return None, None, None
 
     # Si no se especifica bomba, buscar en ambas (primero B para evitar colisiones comunes)
