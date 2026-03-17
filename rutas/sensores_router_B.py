@@ -1087,7 +1087,8 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         info_para_alerta['conteo'] = conteo_ventana
         # Consultar bomba activa actual
         bomba_reg = db.query(BombaActiva).order_by(BombaActiva.id.desc()).first()
-        bomba_activa_id = bomba_reg.bomba_activa if bomba_reg else "B"
+        bomba_val = bomba_reg.bomba_activa if bomba_reg else None
+        bomba_activa_id = bomba_val if bomba_val and bomba_val != "O" else "B"
         alerta_info = determinar_alerta(info_para_alerta, umbral_key, bomba_activa_id)
         if alerta_info:
             prev = db.query(Alerta) \

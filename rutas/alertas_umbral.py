@@ -234,7 +234,8 @@ def _formato_origen(bomba_activa_valor, tabla_origen):
     bomba_activa_valor: 'A', 'B', 'A/B' u 'O'
     """
     if not bomba_activa_valor or bomba_activa_valor == "O":
-        return "Sin bomba activa"
+        # Sin bomba activa o ninguna: dejar la alerta en su bomba original
+        return f"Bomba {tabla_origen}"
 
     if bomba_activa_valor == "A/B":
         return f"Bomba {tabla_origen} (Ambas activas)"
@@ -246,14 +247,16 @@ def _reescribir_descripcion(descripcion, bomba_activa_valor):
     """
     Reemplaza las referencias a BOMBA A/B en la descripción
     con la bomba activa actual.
+    Cuando bomba_activa es 'O' o None, no modifica la descripción (se queda con la original).
     """
     if not descripcion or not bomba_activa_valor:
         return descripcion
 
+    # Si ninguna bomba activa, dejar descripción original
     if bomba_activa_valor == "O":
-        bomba_texto = "SIN BOMBA ACTIVA"
-        bomba_texto_min = "Sin bomba activa"
-    elif bomba_activa_valor == "A/B":
+        return descripcion
+
+    if bomba_activa_valor == "A/B":
         bomba_texto = "BOMBA A/B"
         bomba_texto_min = "A/B"
     else:
