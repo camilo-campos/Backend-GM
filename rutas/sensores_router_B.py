@@ -475,7 +475,7 @@ def predecir_sensores_np(modelo, valor):
     return int(modelo.predict(X)[0])
 
 
-def contar_anomalias_cached(db: Session, model_class, tiempo_base: datetime) -> dict:
+def contar_anomalias_cached(db: Session, model_class, tiempo_base: datetime, umbral_key: str = None, modelo_alerta=None) -> dict:
     """
     Versión con cache de contar_anomalias().
     Reduce queries a BD cuando múltiples sensores llegan en poco tiempo.
@@ -497,7 +497,7 @@ def contar_anomalias_cached(db: Session, model_class, tiempo_base: datetime) -> 
 
     # Cache miss - calcular
     logger.info(f"❌ Cache MISS para {model_class.__tablename__}, consultando BD...")
-    resultado = contar_anomalias(db, model_class, tiempo_base)
+    resultado = contar_anomalias(db, model_class, tiempo_base, umbral_key, modelo_alerta)
 
     # Guardar en cache
     CACHE_ANOMALIAS[cache_key] = (resultado, datetime.now())
@@ -513,12 +513,36 @@ def contar_anomalias_cached(db: Session, model_class, tiempo_base: datetime) -> 
     return resultado
 
 
-def contar_anomalias(db: Session, model_class, tiempo_base: datetime) -> dict:
+def _obtener_timestamp_ultima_critica_b(db: Session, modelo_alerta, umbral_key: str):
+    """
+    Busca el timestamp de la última alerta CRÍTICA para un sensor de Bomba B.
+    Se usa como punto de inicio del conteo para no repetir alertas del ciclo anterior.
+    """
+    try:
+        ultima_critica = db.query(modelo_alerta).filter(
+            modelo_alerta.tipo_sensor == umbral_key,
+            modelo_alerta.descripcion.like("CRÍTICA%")
+        ).order_by(modelo_alerta.id.desc()).first()
+        if ultima_critica:
+            return ultima_critica.timestamp
+    except Exception:
+        pass
+    return None
+
+
+def contar_anomalias(db: Session, model_class, tiempo_base: datetime, umbral_key: str = None, modelo_alerta=None) -> dict:
     """
     Cuenta anomalías (clasificacion == -1) para un modelo de sensor específico.
-    Usa COUNT directo para el conteo (robusto) y análisis temporal separado (opcional).
+    Si hay una alerta CRÍTICA reciente, cuenta solo desde ese punto para resetear el ciclo.
     """
     inicio = tiempo_base - timedelta(hours=VENTANA_HORAS)
+
+    # Si se proporcionó el sensor y modelo de alerta, buscar última CRÍTICA
+    if umbral_key and modelo_alerta:
+        ts_ultima_critica = _obtener_timestamp_ultima_critica_b(db, modelo_alerta, umbral_key)
+        if ts_ultima_critica and ts_ultima_critica > inicio:
+            inicio = ts_ultima_critica
+            logger.info(f"[CONTAR_ANOMALIAS_B] {model_class.__tablename__}: contando desde última CRÍTICA ({ts_ultima_critica})")
 
     # ── 1. COUNT robusto: nunca puede fallar por análisis temporal ──
     try:
@@ -1073,7 +1097,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
     # ── PASO 4: Info de anomalías para alertas ──
     try:
         tiempo_base = lectura.tiempo_ejecucion if lectura.tiempo_ejecucion is not None else tiempo_actual
-        info_anomalias = contar_anomalias_cached(db, model_class, tiempo_base)
+        info_anomalias = contar_anomalias_cached(db, model_class, tiempo_base, umbral_key, Alerta)
     except Exception as e:
         logger.warning(f"Error en contar_anomalias_cached: {e}")
         db.rollback()
@@ -1132,18 +1156,6 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 db.add(alerta)
                 db.commit()
                 logger.info(f"[{umbral_key}] Nueva alerta {alerta_info['nivel']} (conteo={conteo_ventana})")
-
-                # Si se alcanzó CRÍTICA, resetear el ciclo:
-                # Marcar anomalías de la ventana como procesadas (clasificacion=-2)
-                # para que el contador vuelva a 0 en el siguiente insert
-                if curr_n == 3:
-                    tiempo_reset = datetime.now() - timedelta(hours=VENTANA_HORAS)
-                    resetados = db.query(model_class).filter(
-                        model_class.clasificacion == -1,
-                        model_class.tiempo_ejecucion >= tiempo_reset
-                    ).update({'clasificacion': -2}, synchronize_session=False)
-                    db.commit()
-                    logger.info(f"[{umbral_key}] CRÍTICA alcanzada: {resetados} anomalías marcadas como procesadas, contador reseteado")
 
     return {
         "id_registro": lectura.id,
