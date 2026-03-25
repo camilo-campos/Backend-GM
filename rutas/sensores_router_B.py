@@ -307,84 +307,84 @@ VENTANA_HORAS = 8  # horas
 UMBRAL_SENSORES = {
     # === Sensores principales Bomba B ===
     'prediccion_corriente': {
-        "umbral_minimo": 54,    # 50% de 108
-        "umbral_alerta": 86,    # 80% de 108
-        "umbral_critica": 108,  # Corriente MTR BBA Agua Alim 1B
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_presion_agua': {
-        "umbral_minimo": 25,    # 50% de 51
-        "umbral_alerta": 41,    # 80% de 51
-        "umbral_critica": 51,   # Presión Agua Alimentación Econ. AP
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temperatura_ambiental': {
-        "umbral_minimo": 14,    # Similar a Bomba A
-        "umbral_alerta": 22,
-        "umbral_critica": 28,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_excentricidad_bomba': {
-        "umbral_minimo": 5,     # Valor mínimo (original era 0)
-        "umbral_alerta": 8,
-        "umbral_critica": 10,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo_descarga': {
-        "umbral_minimo": 66,    # 50% de 132
-        "umbral_alerta": 106,   # 80% de 132
-        "umbral_critica": 132,  # Flujo Descarga AP BAA AE01B
+        "umbral_minimo": 66,
+        "umbral_alerta": 106,
+        "umbral_critica": 132,
     },
     'prediccion_flujo_agua_domo_ap': {
-        "umbral_minimo": 39,    # 50% de 78
-        "umbral_alerta": 62,    # 80% de 78
-        "umbral_critica": 78,   # Flujo de Agua Alimentación Domo AP Compensated
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo_domo_ap_compensated': {
-        "umbral_minimo": 39,
-        "umbral_alerta": 62,
-        "umbral_critica": 78,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo_agua_domo_mp': {
-        "umbral_minimo": 22,    # 50% de 45
-        "umbral_alerta": 36,    # 80% de 45
-        "umbral_critica": 45,   # Flujo de Agua Alimentación Domo MP Compensated
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo_agua_recalentador': {
-        "umbral_minimo": 45,    # 50% de 91
-        "umbral_alerta": 73,    # 80% de 91
-        "umbral_critica": 91,   # Flujo de Agua/Atemp Recale Calient RH
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo_agua_vapor_alta': {
-        "umbral_minimo": 13,    # 50% de 26
-        "umbral_alerta": 21,    # 80% de 26
-        "umbral_critica": 26,   # Flujo de Agua/Atemp Vapor Alta AP SH
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temperatura_agua_alim': {
-        "umbral_minimo": 16,    # 50% de 32
-        "umbral_alerta": 26,    # 80% de 32
-        "umbral_critica": 32,   # Temperatura Agua Alim AP
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temperatura_estator': {
-        "umbral_minimo": 36,    # 50% de 73
-        "umbral_alerta": 58,    # 80% de 73
-        "umbral_critica": 73,   # Temperatura Estator MTR BBA AA 1B A
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_vibracion_axial_empuje': {
-        "umbral_minimo": 52,    # 50% de 104
-        "umbral_alerta": 83,    # 80% de 104
-        "umbral_critica": 104,  # Vibración Axial Descanso Emp Bomba 1B
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_vibracion_x_descanso': {
-        "umbral_minimo": 67,    # 50% de 133
-        "umbral_alerta": 106,   # 80% de 133
-        "umbral_critica": 133,  # Vibración X Descanso Interno Bomba 1B
+        "umbral_minimo": 67,
+        "umbral_alerta": 106,
+        "umbral_critica": 133,
     },
     'prediccion_vibracion_y_descanso': {
-        "umbral_minimo": 54,    # 50% de 107
-        "umbral_alerta": 86,    # 80% de 107
-        "umbral_critica": 107,  # Vibración Y Descanso Interno Bomba 1B
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_voltaje_barra': {
-        "umbral_minimo": 18,    # 50% de 35
-        "umbral_alerta": 28,    # 80% de 35
-        "umbral_critica": 35,   # Voltaje Barra 6,6KV
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     # === Aliases para compatibilidad ===
     'prediccion_temp-descanso-bomba-1a': {
@@ -393,24 +393,24 @@ UMBRAL_SENSORES = {
         "umbral_critica": 171,
     },
     'prediccion_temp-empuje-bomba-1a': {
-        "umbral_minimo": 55,
-        "umbral_alerta": 88,
-        "umbral_critica": 110,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temp-motor-bomba-1a': {
-        "umbral_minimo": 13,
-        "umbral_alerta": 20,
-        "umbral_critica": 25,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_vibracion-axial': {
-        "umbral_minimo": 52,
-        "umbral_alerta": 83,
-        "umbral_critica": 104,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_voltaje-barra': {
-        "umbral_minimo": 18,
-        "umbral_alerta": 28,
-        "umbral_critica": 35,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     # === Temperaturas descanso Bomba B ===
     'prediccion_temp_descanso_bomba': {
@@ -419,14 +419,14 @@ UMBRAL_SENSORES = {
         "umbral_critica": 171,
     },
     'prediccion_temp_descanso_empuje': {
-        "umbral_minimo": 55,
-        "umbral_alerta": 88,
-        "umbral_critica": 110,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temp_descanso_motor': {
-        "umbral_minimo": 13,
-        "umbral_alerta": 20,
-        "umbral_critica": 25,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     # === Vibraciones externas ===
     'prediccion_vibracion_x_descanso_externo': {
@@ -435,35 +435,35 @@ UMBRAL_SENSORES = {
         "umbral_critica": 120,
     },
     'prediccion_vibracion_y_descanso_externo': {
-        "umbral_minimo": 50,
-        "umbral_alerta": 80,
-        "umbral_critica": 100,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     # === Nuevos sensores ===
     'prediccion_presion_succion_baa': {
-        "umbral_minimo": 25,
-        "umbral_alerta": 40,
-        "umbral_critica": 50,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_posicion_valvula_recirc': {
-        "umbral_minimo": 25,
-        "umbral_alerta": 40,
-        "umbral_critica": 50,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_mw_brutos_generacion_gas': {
         "umbral_minimo": 56,
-        "umbral_alerta": 90,
-        "umbral_critica": 112,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_presion_agua_econ_ap': {
-        "umbral_minimo": 25,
-        "umbral_alerta": 41,
-        "umbral_critica": 51,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo_atemp_vapor_alta_ap': {
-        "umbral_minimo": 13,    # Igual a flujo vapor alta AP Bomba A
-        "umbral_alerta": 21,
-        "umbral_critica": 26,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
 }
 

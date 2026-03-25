@@ -226,9 +226,9 @@ VENTANA_HORAS = 8  # horas
 UMBRAL_SENSORES = {
     # === Sensores con umbrales del análisis ML ===
     'prediccion_corriente': {
-        "umbral_minimo": 101,   # AVISO (50%)
-        "umbral_alerta": 162,   # ALERTA (80%)
-        "umbral_critica": 202,  # CRITICA (100%)
+        "umbral_minimo": 101,
+        "umbral_alerta": 162,
+        "umbral_critica": 202,
     },
     'prediccion_presion-agua': {
         "umbral_minimo": 118,
@@ -237,13 +237,13 @@ UMBRAL_SENSORES = {
     },
     'prediccion_mw-brutos-gas': {
         "umbral_minimo": 56,
-        "umbral_alerta": 90,
-        "umbral_critica": 112,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temperatura-ambiental': {
-        "umbral_minimo": 14,
-        "umbral_alerta": 22,
-        "umbral_critica": 28,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temp-descanso-bomba-1a': {
         "umbral_minimo": 86,
@@ -251,108 +251,108 @@ UMBRAL_SENSORES = {
         "umbral_critica": 171,
     },
     'prediccion_temp-empuje-bomba-1a': {
-        "umbral_minimo": 55,
-        "umbral_alerta": 88,
-        "umbral_critica": 110,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temp-motor-bomba-1a': {
-        "umbral_minimo": 13,
-        "umbral_alerta": 20,
-        "umbral_critica": 25,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_vibracion-axial': {
-        "umbral_minimo": 29,
-        "umbral_alerta": 46,
-        "umbral_critica": 58,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_voltaje-barra': {
-        "umbral_minimo": 18,
-        "umbral_alerta": 29,
-        "umbral_critica": 36,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
-    # === Sensores calculados (crítica del análisis, 50%/80% derivados) ===
+    # === Sensores calculados ===
     'prediccion_flujo-salida-12fpmfc': {
-        "umbral_minimo": 40,    # 50% de 80
-        "umbral_alerta": 64,    # 80% de 80
-        "umbral_critica": 80,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo-agua-domo-ap': {
-        "umbral_minimo": 39,    # 50% de 78
-        "umbral_alerta": 62,    # 80% de 78
-        "umbral_critica": 78,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo-domo-ap-compensated': {
-        "umbral_minimo": 39,
-        "umbral_alerta": 62,
-        "umbral_critica": 78,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo-agua-domo-mp': {
-        "umbral_minimo": 22,    # 50% de 45
-        "umbral_alerta": 36,    # 80% de 45
-        "umbral_critica": 45,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_excentricidad-bomba': {
-        "umbral_minimo": 5,     # Valor mínimo razonable
-        "umbral_alerta": 8,
-        "umbral_critica": 10,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo-agua-recalentador': {
-        "umbral_minimo": 45,    # 50% de 91
-        "umbral_alerta": 73,    # 80% de 91
-        "umbral_critica": 91,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_flujo-agua-vapor-alta': {
-        "umbral_minimo": 13,    # 50% de 26
-        "umbral_alerta": 21,    # 80% de 26
-        "umbral_critica": 26,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_posicion-valvula-recirc': {
-        "umbral_minimo": 25,    # Estimado basado en patrones similares
-        "umbral_alerta": 40,
-        "umbral_critica": 50,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_presion-agua-mp': {
-        "umbral_minimo": 25,    # 50% de 51
-        "umbral_alerta": 41,    # 80% de 51
-        "umbral_critica": 51,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_presion-succion-baa': {
-        "umbral_minimo": 25,    # Estimado
-        "umbral_alerta": 40,
-        "umbral_critica": 50,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     'prediccion_temperatura-estator': {
-        "umbral_minimo": 36,    # 50% de 73
-        "umbral_alerta": 58,    # 80% de 73
-        "umbral_critica": 73,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     # === Vibraciones internas ===
     'prediccion_vibracion-x-interno': {
-        "umbral_minimo": 67,    # 50% de 133
-        "umbral_alerta": 106,   # 80% de 133
+        "umbral_minimo": 67,
+        "umbral_alerta": 106,
         "umbral_critica": 133,
     },
     'prediccion_vibracion-y-interno': {
-        "umbral_minimo": 54,    # 50% de 107
-        "umbral_alerta": 86,    # 80% de 107
-        "umbral_critica": 107,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     # === Vibraciones externas ===
     'prediccion_vibracion-x-externo': {
-        "umbral_minimo": 60,    # Estimado similar a internas
+        "umbral_minimo": 60,
         "umbral_alerta": 96,
         "umbral_critica": 120,
     },
     'prediccion_vibracion-y-externo': {
-        "umbral_minimo": 50,
-        "umbral_alerta": 80,
-        "umbral_critica": 100,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
     # === Temperatura agua alimentación domo MP ===
     'prediccion_temperatura-agua-alim-domo-mp': {
-        "umbral_minimo": 16,    # 50% de 32
-        "umbral_alerta": 26,    # 80% de 32
-        "umbral_critica": 32,
+        "umbral_minimo": 56,
+        "umbral_alerta": 86,
+        "umbral_critica": 116,
     },
 }
 
