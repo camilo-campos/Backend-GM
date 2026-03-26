@@ -444,3 +444,16 @@ class GmBitacoraB(Base):
     procesado_llm = Column(Boolean, default=False)
     fecha_procesado = Column(DateTime, nullable=True)
     resumen_llm = Column(Text, nullable=True)
+
+
+class Feedback(Base):
+    __tablename__ = 'feedback'
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_email = Column(String(255), nullable=False)
+    tipo = Column(String(50), nullable=False)  # comentario, reclamo, felicitacion
+    mensaje = Column(Text, nullable=False)
+    estado = Column(String(50), default='pendiente')  # pendiente, revisado, resuelto
+    imagen_url = Column(Text, nullable=True)
+    fecha_creacion = Column(DateTime, default=func.now())
+    fecha_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())

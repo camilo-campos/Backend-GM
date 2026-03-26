@@ -13,6 +13,7 @@ from rutas.bitacoras_router_b import router as bitacoras_router_b
 from rutas.sensores_router_B import router_b as sensores_router_b
 from rutas.gm_bitacoras_router import router as gm_bitacoras_router
 from rutas.bomba_activa_router import router as bomba_activa_router
+from rutas.feedback_router import router as feedback_router
 from modelos.database import engine, Base, SessionLocal
 from auth.dependencies import get_current_user, get_current_user_optional, get_user_from_docs_auth
 
@@ -156,3 +157,4 @@ app.include_router(gm_bitacoras_router, dependencies=[Depends(get_current_user)]
 app.include_router(alertas_router, dependencies=[Depends(get_current_user)])
 app.include_router(sensores_router_b, dependencies=[Depends(get_current_user)])
 app.include_router(bomba_activa_router, dependencies=[Depends(get_current_user)])
+app.include_router(feedback_router, dependencies=[Depends(get_current_user)])

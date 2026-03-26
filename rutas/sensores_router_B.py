@@ -27,6 +27,21 @@ from modelos.modelos import (
     BombaActiva,
 )
 
+import time as _time
+
+_BOMBA_ACTIVA_CACHE = {"valor": None, "ts": 0}
+_BOMBA_ACTIVA_TTL = 60  # seconds
+
+def _get_bomba_activa_cached(db):
+    ahora = _time.time()
+    if ahora - _BOMBA_ACTIVA_CACHE["ts"] < _BOMBA_ACTIVA_TTL:
+        return _BOMBA_ACTIVA_CACHE["valor"]
+    reg = db.query(BombaActiva).order_by(BombaActiva.id.desc()).first()
+    val = reg.bomba_activa if reg else None
+    _BOMBA_ACTIVA_CACHE["valor"] = val
+    _BOMBA_ACTIVA_CACHE["ts"] = ahora
+    return val
+
 router_b = APIRouter(prefix="/sensores_b", tags=["Sensores Bomba B"])
 
 
@@ -203,6 +218,8 @@ MODEL_PATHS = {
     # Tabla compartida Bomba A - nueva ruta en Bomba B
     "flujo_atemp_vapor_alta_ap": "Flujo_de_Agua_Atemp_Vapor_Alta_AP_SH.pkl",  # Modelo Bomba A
     "flujo_domo_ap_compensated": "Flujo_de_Agua_Alimentacion_Domo_AP_Compensated_18B.pkl",  # Misma tabla flujo_agua_domo_ap_b
+    # Modelo global de predicción Bomba B
+    "bomba_b_global": "bm_randomforest_bomba_b.pkl",
 }
 
 class ModelRegistry:
@@ -544,18 +561,25 @@ def contar_anomalias(db: Session, model_class, tiempo_base: datetime, umbral_key
             inicio = ts_ultima_critica
             logger.info(f"[CONTAR_ANOMALIAS_B] {model_class.__tablename__}: contando desde última CRÍTICA ({ts_ultima_critica})")
 
-    # ── 1. COUNT robusto: nunca puede fallar por análisis temporal ──
+    # ── 1. Query única: SELECT timestamps + valor_sensor (el conteo se deriva con len()) ──
     try:
-        conteo = db.query(func.count(model_class.id)).filter(
+        filas = db.query(model_class.tiempo_ejecucion, model_class.valor_sensor).filter(
             model_class.clasificacion == -1,
             model_class.tiempo_ejecucion.isnot(None),
             model_class.tiempo_ejecucion >= inicio,
             model_class.tiempo_ejecucion <= tiempo_base
-        ).scalar() or 0
-        logger.info(f"[CONTAR_ANOMALIAS_B] {model_class.__tablename__}: {conteo} anomalías en ventana")
+        ).order_by(model_class.tiempo_ejecucion.asc()).all()
+
+        anomalias = [{'tiempo_ejecucion': f.tiempo_ejecucion, 'valor_sensor': f.valor_sensor}
+                     for f in filas if f.tiempo_ejecucion is not None]
+        timestamps_validos = [a['tiempo_ejecucion'] for a in anomalias]
+        conteo = len(timestamps_validos)
+        logger.info(f"[CONTAR_ANOMALIAS_B] {model_class.__tablename__}: {conteo} anomalías en ventana {inicio} - {tiempo_base}")
     except Exception as e:
-        logger.error(f"[CONTAR_ANOMALIAS_B] Error en COUNT: {e}")
+        logger.error(f"[CONTAR_ANOMALIAS_B] Error: {e}")
         conteo = 0
+        anomalias = []
+        timestamps_validos = []
 
     if conteo == 0:
         return {
@@ -569,34 +593,19 @@ def contar_anomalias(db: Session, model_class, tiempo_base: datetime, umbral_key
             'patron_consecutivo': False
         }
 
-    # ── 2. Análisis temporal (opcional, no afecta el conteo) ──
-    primera_anomalia = None
-    ultima_anomalia = None
-    duracion_total = 0
+    # ── 2. Análisis temporal (usa datos ya obtenidos, sin query adicional) ──
+    primera_anomalia = timestamps_validos[0]
+    ultima_anomalia = timestamps_validos[-1]
+    duracion_total = (ultima_anomalia - primera_anomalia).total_seconds()
+    frecuencia_por_hora = round(conteo / VENTANA_HORAS, 2) if VENTANA_HORAS > 0 else 0.0
     anomalias_consecutivas = 0
     patron_consecutivo = False
     distribucion_temporal = {}
-    frecuencia_por_hora = round(conteo / VENTANA_HORAS, 2) if VENTANA_HORAS > 0 else 0.0
 
     try:
-        filas = db.query(model_class.tiempo_ejecucion, model_class.valor_sensor).filter(
-            model_class.clasificacion == -1,
-            model_class.tiempo_ejecucion.isnot(None),
-            model_class.tiempo_ejecucion >= inicio,
-            model_class.tiempo_ejecucion <= tiempo_base
-        ).order_by(model_class.tiempo_ejecucion).all()
-
-        anomalias = [{'tiempo_ejecucion': f.tiempo_ejecucion, 'valor_sensor': f.valor_sensor}
-                     for f in filas if f.tiempo_ejecucion is not None]
-        timestamps_validos = [a['tiempo_ejecucion'] for a in anomalias]
-
-        if timestamps_validos:
-            primera_anomalia = min(timestamps_validos)
-            ultima_anomalia = max(timestamps_validos)
-            duracion_total = (ultima_anomalia - primera_anomalia).total_seconds()
-            anomalias_consecutivas = calcular_anomalias_consecutivas(anomalias)
-            patron_consecutivo = anomalias_consecutivas > 3
-            distribucion_temporal = crear_distribucion_temporal(anomalias)
+        anomalias_consecutivas = calcular_anomalias_consecutivas(anomalias)
+        patron_consecutivo = anomalias_consecutivas > 3
+        distribucion_temporal = crear_distribucion_temporal(anomalias)
     except Exception as e:
         logger.warning(f"[CONTAR_ANOMALIAS_B] Error en análisis temporal (conteo={conteo} sigue siendo válido): {e}")
 
@@ -1037,13 +1046,6 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
 
         # ── PASO 3: UPDATE ATÓMICO - clasificación + contador en UNA operación ──
         if sensor.id_sensor:
-            # Verificar que el registro existe
-            existe = db.query(model_class.id).filter(
-                model_class.id == sensor.id_sensor
-            ).first()
-            if not existe:
-                raise HTTPException(404, f"Registro con id {sensor.id_sensor} no encontrado")
-
             rows_updated = db.query(model_class).filter(
                 model_class.id == sensor.id_sensor
             ).update({
@@ -1052,7 +1054,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             }, synchronize_session=False)
 
             if rows_updated == 0:
-                raise HTTPException(404, f"No se pudo actualizar registro {sensor.id_sensor}")
+                raise HTTPException(404, f"Registro con id {sensor.id_sensor} no encontrado en {model_class.__tablename__}")
 
             db.commit()
             logger.info(f"UPDATE OK ID {sensor.id_sensor}: clasificacion={clase}, contador={conteo_ventana}")
@@ -1110,8 +1112,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         info_para_alerta = dict(info_anomalias)
         info_para_alerta['conteo'] = conteo_ventana
         # Consultar bomba activa actual
-        bomba_reg = db.query(BombaActiva).order_by(BombaActiva.id.desc()).first()
-        bomba_val = bomba_reg.bomba_activa if bomba_reg else None
+        bomba_val = _get_bomba_activa_cached(db)
         bomba_activa_id = bomba_val if bomba_val and bomba_val != "O" else "B"
         alerta_info = determinar_alerta(info_para_alerta, umbral_key, bomba_activa_id)
         if alerta_info:
@@ -1682,12 +1683,9 @@ async def predecir_bomba_b(
     db: Session = Depends(get_db)
 ):
     try:
-        # Obtener el modelo usando ModelRegistry
+        # Obtener el modelo usando ModelRegistry (carga lazy, cacheado en memoria)
         logger.info("Obteniendo modelo para predicción de bomba B")
-        # La clave que usaremos es una especial, ya que este modelo no está en el diccionario normal
-        # Así que tendremos que cargar el archivo directamente
-        model_path = os.path.join(MODELS_DIR, "bm_randomforest_bomba_b.pkl")
-        model = joblib.load(model_path)
+        model = ModelRegistry.get_model("bomba_b_global")
         
         # Preparar los datos en el orden correcto para el modelo
         input_data = pd.DataFrame([{
