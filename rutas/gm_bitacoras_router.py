@@ -6,6 +6,7 @@ from langchain_llm.analisis import llm_chain, llm_chain_2
 from utils.traduccion_bitacoras import verificar_y_traducir_bitacora, traducir_clasificacion
 from pydantic import BaseModel
 from typing import Optional
+import asyncio
 
 router = APIRouter(prefix="/gm-bitacoras", tags=["GM Bitacoras Bomba A"])
 
@@ -200,10 +201,11 @@ async def clasificar_pendientes(
         for b in pendientes:
             try:
                 texto = b.bitacora or b.observaciones or "Sin observacion"
-                primer_analisis = llm_chain.invoke({"bitacora": texto}).strip()
+                loop = asyncio.get_event_loop()
+                primer_analisis = await loop.run_in_executor(None, lambda texto=texto: llm_chain.invoke({"bitacora": texto}).strip())
 
                 if "HRSG Pump Failures" in primer_analisis:
-                    segundo_analisis = llm_chain_2.invoke({"bitacora": texto}).strip()
+                    segundo_analisis = await loop.run_in_executor(None, lambda texto=texto: llm_chain_2.invoke({"bitacora": texto}).strip())
                     b.clasificacion = primer_analisis
                     b.alerta_aviso = segundo_analisis
                 else:
@@ -275,10 +277,11 @@ async def clasificar_bitacora(data: ClasificarBitacoraInput, db: Session = Depen
             raise HTTPException(status_code=404, detail="Bitacora no encontrada")
 
         # Clasificar
-        primer_analisis = llm_chain.invoke({"bitacora": data.bitacora}).strip()
+        loop = asyncio.get_event_loop()
+        primer_analisis = await loop.run_in_executor(None, lambda: llm_chain.invoke({"bitacora": data.bitacora}).strip())
 
         if "HRSG Pump Failures" in primer_analisis:
-            segundo_analisis = llm_chain_2.invoke({"bitacora": data.bitacora}).strip()
+            segundo_analisis = await loop.run_in_executor(None, lambda: llm_chain_2.invoke({"bitacora": data.bitacora}).strip())
             bitacora_db.clasificacion = primer_analisis
             bitacora_db.alerta_aviso = segundo_analisis
         else:

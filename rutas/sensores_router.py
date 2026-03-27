@@ -30,6 +30,21 @@ import time as _time
 _BOMBA_ACTIVA_CACHE = {"valor": None, "ts": 0}
 _BOMBA_ACTIVA_TTL = 60  # seconds
 
+_CACHE_ULTIMA_ALERTA = {}
+_CACHE_ALERTA_TTL = 30  # seconds
+
+def _get_ultima_alerta_cached(db, modelo_alerta, umbral_key):
+    """Cache de la última alerta por sensor (TTL 30s)."""
+    ahora = _time.time()
+    cached = _CACHE_ULTIMA_ALERTA.get(umbral_key)
+    if cached and ahora - cached[1] < _CACHE_ALERTA_TTL:
+        return cached[0]
+    prev = db.query(modelo_alerta).filter(
+        modelo_alerta.tipo_sensor == umbral_key
+    ).order_by(modelo_alerta.id.desc()).first()
+    _CACHE_ULTIMA_ALERTA[umbral_key] = (prev, ahora)
+    return prev
+
 def _get_bomba_activa_cached(db):
     ahora = _time.time()
     if ahora - _BOMBA_ACTIVA_CACHE["ts"] < _BOMBA_ACTIVA_TTL:
@@ -946,53 +961,39 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         tiempo_actual = datetime.now()
 
         # Parsear tiempo_sensor si viene
-        sensor_dt = None
-        try:
-            if hasattr(sensor, 'tiempo_sensor') and sensor.tiempo_sensor is not None:
-                if isinstance(sensor.tiempo_sensor, datetime):
-                    sensor_dt = sensor.tiempo_sensor
-                elif isinstance(sensor.tiempo_sensor, str):
+        sensor_dt = tiempo_actual
+        if hasattr(sensor, 'tiempo_sensor') and sensor.tiempo_sensor is not None:
+            ts = str(sensor.tiempo_sensor)
+            try:
+                sensor_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            except Exception:
+                for fmt in ("%H:%M:%S", "%H:%M", "%Y-%m-%d %H:%M:%S"):
                     try:
-                        sensor_dt = datetime.fromisoformat(sensor.tiempo_sensor.replace('Z', '+00:00'))
+                        parsed = datetime.strptime(ts, fmt)
+                        if fmt.startswith("%H"):
+                            sensor_dt = datetime.combine(tiempo_actual.date(), parsed.time())
+                        else:
+                            sensor_dt = parsed
+                        break
                     except Exception:
-                        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
-                            try:
-                                sensor_dt = datetime.strptime(sensor.tiempo_sensor, fmt)
-                                break
-                            except Exception:
-                                pass
-                        if not sensor_dt:
-                            for fmt in ("%H:%M:%S", "%H:%M"):
-                                try:
-                                    hora_tmp = datetime.strptime(sensor.tiempo_sensor, fmt).time()
-                                    sensor_dt = datetime.combine(tiempo_actual.date(), hora_tmp)
-                                    break
-                                except Exception:
-                                    pass
-            if not sensor_dt:
-                sensor_dt = tiempo_actual
-        except Exception:
-            sensor_dt = tiempo_actual
+                        pass
 
         # ── PASO 2: Contar anomalías en ventana de 8 horas ──
         # Usar sensor_dt como base de la ventana (no datetime.now())
         # para que coincida con los timestamps reales de los datos en BD
         tiempo_base_ventana = sensor_dt or tiempo_actual
-        tiempo_inicio = tiempo_base_ventana - timedelta(hours=VENTANA_HORAS)
         try:
-            conteo_ventana = db.query(func.count(model_class.id)).filter(
-                model_class.clasificacion == -1,
-                model_class.tiempo_ejecucion.isnot(None),
-                model_class.tiempo_ejecucion >= tiempo_inicio,
-                model_class.tiempo_ejecucion <= tiempo_base_ventana
-            ).scalar() or 0
+            info_anomalias = contar_anomalias_cached(db, model_class, tiempo_base_ventana, umbral_key, Alerta)
+            conteo_ventana = info_anomalias.get('conteo', 0)
+            if clase == -1:
+                conteo_ventana += 1
         except Exception as e:
-            logger.error(f"Error en COUNT ventana 8h: {e}")
+            logger.warning(f"Error en contar_anomalias: {e}")
+            db.rollback()
             conteo_ventana = 0
-
-        # Si el registro actual es anomalía, sumar 1 al conteo (aún no está clasificado en BD)
-        if clase == -1:
-            conteo_ventana += 1
+            info_anomalias = {'conteo': 0, 'primera_anomalia': None, 'ultima_anomalia': None,
+                              'anomalias_consecutivas': 0, 'frecuencia_por_hora': 0, 'patron_consecutivo': False,
+                              'distribucion_temporal': []}
 
         logger.info(f"[{umbral_key}] ID={sensor.id_sensor}: clase={clase}, conteo_ventana_8h={conteo_ventana}")
 
@@ -1011,36 +1012,15 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
             db.commit()
             logger.info(f"UPDATE OK ID {sensor.id_sensor}: clasificacion={clase}, contador={conteo_ventana}")
 
-            # Cargar el objeto para uso posterior
-            lectura = db.query(model_class).filter(
-                model_class.id == sensor.id_sensor
-            ).first()
+            # Objeto ligero para uso posterior (evita SELECT adicional)
+            class _Ref:
+                pass
+            lectura = _Ref()
+            lectura.id = sensor.id_sensor
+            lectura.tiempo_ejecucion = sensor_dt
 
         else:
-            # Comportamiento sin id_sensor: buscar o crear registro
-            lectura = db.query(model_class).filter(
-                model_class.tiempo_ejecucion.isnot(None)
-            ).order_by(model_class.id.desc()).first()
-
-            if not lectura:
-                lectura = model_class(
-                    tiempo_ejecucion=sensor_dt,
-                    tiempo_sensor=(sensor.tiempo_sensor if isinstance(sensor.tiempo_sensor, str) else sensor_dt.strftime("%Y-%m-%d %H:%M:%S")),
-                    valor_sensor=sensor.valor,
-                    clasificacion=clase,
-                    contador_anomalias=conteo_ventana
-                )
-                db.add(lectura)
-            else:
-                lectura.clasificacion = clase
-                lectura.valor_sensor = sensor.valor
-                lectura.tiempo_ejecucion = sensor_dt
-                lectura.tiempo_sensor = (sensor.tiempo_sensor if isinstance(sensor.tiempo_sensor, str) else sensor_dt.strftime("%Y-%m-%d %H:%M:%S"))
-                lectura.contador_anomalias = conteo_ventana
-
-            db.commit()
-            if hasattr(lectura, 'id') and lectura.id:
-                db.refresh(lectura)
+            raise HTTPException(400, "id_sensor es requerido")
 
     except HTTPException:
         raise
@@ -1049,19 +1029,9 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         db.rollback()
         raise HTTPException(500, f"Error al procesar datos del sensor: {str(e)}")
 
-    # ── PASO 4: Info de anomalías para alertas ──
-    try:
-        tiempo_base = lectura.tiempo_ejecucion if lectura.tiempo_ejecucion is not None else tiempo_actual
-        info_anomalias = contar_anomalias_cached(db, model_class, tiempo_base, umbral_key, Alerta)
-    except Exception as e:
-        logger.warning(f"Error en contar_anomalias_cached: {e}")
-        db.rollback()
-        info_anomalias = {'conteo': conteo_ventana, 'primera_anomalia': None, 'ultima_anomalia': None,
-                          'anomalias_consecutivas': 0, 'frecuencia_por_hora': 0, 'patron_consecutivo': False,
-                          'distribucion_temporal': {}, 'duracion_total': 0}
-
-    # ── PASO 5: Evaluar alertas según conteo_ventana vs umbrales ──
-    if clase == -1 and conteo_ventana > 0:
+    # ── PASO 4: Evaluar alertas según conteo_ventana vs umbrales ──
+    umbral_min = UMBRAL_SENSORES.get(umbral_key, {}).get('umbral_minimo', 56)
+    if clase == -1 and conteo_ventana >= umbral_min:
         info_para_alerta = dict(info_anomalias)
         info_para_alerta['conteo'] = conteo_ventana
         # Consultar bomba activa actual
@@ -1069,10 +1039,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
         bomba_activa_id = bomba_val if bomba_val and bomba_val != "O" else "A"
         alerta_info = determinar_alerta(info_para_alerta, umbral_key, bomba_activa_id)
         if alerta_info:
-            prev = db.query(Alerta) \
-                     .filter(Alerta.tipo_sensor == umbral_key) \
-                     .order_by(Alerta.id.desc()) \
-                     .first()
+            prev = _get_ultima_alerta_cached(db, Alerta, umbral_key)
 
             prev_n = nivel_numerico(prev.descripcion) if prev else 0
             curr_n = nivel_numerico(alerta_info["nivel"])
@@ -1110,6 +1077,7 @@ def procesar(sensor: SensorInput, db: Session, modelo_key: str, umbral_key: str,
                 db.add(alerta)
                 db.commit()
                 logger.info(f"[{umbral_key}] Nueva alerta {alerta_info['nivel']} (conteo={conteo_ventana})")
+                _CACHE_ULTIMA_ALERTA.pop(umbral_key, None)
 
     return {
         "id_registro": lectura.id,
@@ -1293,7 +1261,7 @@ Se evalúan las anomalías en una ventana de 8 horas:
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_corriente(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_corriente(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="corriente_motor", umbral_key="prediccion_corriente", model_class=SensorCorriente)
 
 @router.post(
@@ -1322,7 +1290,7 @@ Valores anormales pueden indicar problemas en el sistema hidráulico, obstruccio
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_presion(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_presion(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="presion_agua", umbral_key="prediccion_presion-agua", model_class=SensorFlujoDeAguaAtempVaporAltaAP)
 
 @router.post(
@@ -1351,7 +1319,7 @@ Anomalías pueden indicar problemas en la conversión energética o ineficiencia
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_mw_gas(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_mw_gas(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="mw_brutos_gas", umbral_key="prediccion_mw-brutos-gas", model_class=SensorMw_brutos_generacion_gas)
 
 @router.post(
@@ -1380,7 +1348,7 @@ Valores extremos pueden afectar el rendimiento de los equipos y la refrigeració
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_temperatura_ambiental(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_temperatura_ambiental(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temperatura_ambiental", umbral_key="prediccion_temperatura-ambiental", model_class=SensorTemperatura_Ambiental)
 
 @router.post(
@@ -1409,7 +1377,7 @@ Temperaturas elevadas indican posible desgaste en rodamientos o falta de lubrica
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_temp_descanso(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_temp_descanso(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temp_descanso_bomba_1a", umbral_key="prediccion_temp-descanso-bomba-1a", model_class=SensorTemperatura_descanso_interno_bomba_1a)
 
 @router.post(
@@ -1438,7 +1406,7 @@ Temperaturas anormales pueden indicar problemas de carga axial o fallas en el si
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_temp_empuje(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_temp_empuje(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temp_descanso_empuje_bomba_1a", umbral_key="prediccion_temp-empuje-bomba-1a", model_class=SensorTemperatura_descanso_interna_empuje_bomba_1aa)
 
 @router.post(
@@ -1467,7 +1435,7 @@ Sobrecalentamiento puede indicar sobrecarga del motor o falla en el sistema de v
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_temp_motor(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_temp_motor(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temp_descanso_motor_bomba_1a", umbral_key="prediccion_temp-motor-bomba-1a", model_class=SensorTemperatura_descanso_interna_motor_bomba_1a)
 
 @router.post(
@@ -1496,7 +1464,7 @@ Vibraciones excesivas indican posible desbalanceo, desalineación o desgaste en 
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_vibracion(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_vibracion(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_axial_empuje", umbral_key="prediccion_vibracion-axial", model_class=SensorVibracion_axial_descanso)
 
 @router.post(
@@ -1525,7 +1493,7 @@ Fluctuaciones de voltaje pueden dañar equipos eléctricos sensibles y afectar l
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_voltaje(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_voltaje(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="voltaje_barra", umbral_key="prediccion_voltaje-barra", model_class=SensorVoltaje_barra)
 
 # Rutas POST para los nuevos sensores
@@ -1555,7 +1523,7 @@ Valores elevados de excentricidad indican posible desalineación, desgaste en co
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_excentricidad_bomba(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_excentricidad_bomba(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="excentricidad_bomba", umbral_key="prediccion_excentricidad-bomba", model_class=SensorExcentricidadBomba)
 
 @router.post(
@@ -1584,7 +1552,7 @@ Variaciones en el flujo pueden afectar la generación de vapor y el balance tér
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_flujo_agua_domo_ap(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_flujo_agua_domo_ap(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_domo_ap", umbral_key="prediccion_flujo-agua-domo-ap", model_class=SensorFlujoAguaDomoAPCompartido)
 
 @router.post(
@@ -1604,7 +1572,7 @@ Analiza el flujo de agua alimentación domo AP compensado.
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_flujo_domo_ap_compensated(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_flujo_domo_ap_compensated(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_domo_ap_compensated", umbral_key="prediccion_flujo-domo-ap-compensated", model_class=SensorFlujoAguaDomoAPCompartido)
 
 @router.post(
@@ -1633,7 +1601,7 @@ Este flujo es esencial para el balance térmico del HRSG. Anomalías pueden afec
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_flujo_agua_domo_mp(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_flujo_agua_domo_mp(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_domo_mp", umbral_key="prediccion_flujo-agua-domo-mp", model_class=SensorFlujoAguaDomoMPB)
 
 @router.post(
@@ -1662,7 +1630,7 @@ Este flujo controla la temperatura del vapor recalentado. Anomalías pueden caus
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_flujo_agua_recalentador(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_flujo_agua_recalentador(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_recalentador", umbral_key="prediccion_flujo-agua-recalentador", model_class=SensorFlujoAguaRecalentador)
 
 @router.post(
@@ -1691,7 +1659,7 @@ Este flujo protege la turbina de temperaturas excesivas. Anomalías pueden causa
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_flujo_agua_vapor_alta(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_flujo_agua_vapor_alta(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_agua_vapor_alta", umbral_key="prediccion_flujo-agua-vapor-alta", model_class=SensorFlujoAguaVaporAlta)
 
 @router.post(
@@ -1720,7 +1688,7 @@ Posiciones anómalas de la válvula pueden causar cavitación en la bomba y dañ
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_posicion_valvula_recirc(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_posicion_valvula_recirc(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="posicion_valvula_recirc", umbral_key="prediccion_posicion-valvula-recirc", model_class=SensorPosicionValvulaRecirc)
 
 @router.post(
@@ -1749,7 +1717,7 @@ Anomalías pueden indicar restricciones en el sistema, fugas o problemas con la 
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_presion_agua_mp(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_presion_agua_mp(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="presion_agua_mp", umbral_key="prediccion_presion-agua-mp", model_class=SensorPresionAguaB)
 
 @router.post(
@@ -1778,7 +1746,7 @@ Baja presión de succión puede causar cavitación severa, daño a los impulsore
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_presion_succion_baa(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_presion_succion_baa(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="presion_succion_baa", umbral_key="prediccion_presion-succion-baa", model_class=SensorPresionSuccionBAA)
 
 @router.post(
@@ -1807,7 +1775,7 @@ Sobrecalentamiento del estator indica posibles problemas de aislamiento, sobreca
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_temperatura_estator(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_temperatura_estator(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temperatura_estator", umbral_key="prediccion_temperatura-estator", model_class=SensorTemperaturaEstator)
 
 @router.post(
@@ -1836,7 +1804,7 @@ Variaciones significativas indican cambios en la operación del sistema que pued
     """,
     response_description="Resultado de la predicción con clasificación y estado de alertas"
 )
-async def predecir_flujo_salida_12fpmfc(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_flujo_salida_12fpmfc(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="flujo_salida_12fpmfc", umbral_key="prediccion_flujo-salida-12fpmfc", model_class=SensorFlujoSalida12FPMFC)
 
 
@@ -2540,7 +2508,7 @@ Analiza la vibracion en eje X del descanso externo de la Bomba A.
     """,
     response_description="Resultado de la prediccion con clasificacion y estado de alertas"
 )
-async def predecir_vibracion_x_externo(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_vibracion_x_externo(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_x_descanso_externo", umbral_key="prediccion_vibracion-x-externo", model_class=SensorVibracionXDescansoExterno)
 
 
@@ -2579,7 +2547,7 @@ Analiza la vibracion en eje Y del descanso externo de la Bomba A.
     """,
     response_description="Resultado de la prediccion con clasificacion y estado de alertas"
 )
-async def predecir_vibracion_y_externo(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_vibracion_y_externo(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_y_descanso_externo", umbral_key="prediccion_vibracion-y-externo", model_class=SensorVibracionYDescansoExterno)
 
 
@@ -2631,7 +2599,7 @@ Se evaluan las anomalias en una ventana de 8 horas:
     """,
     response_description="Resultado de la prediccion con clasificacion y estado de alertas"
 )
-async def predecir_vibracion_x_interno(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_vibracion_x_interno(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_x_descanso_interno", umbral_key="prediccion_vibracion-x-interno", model_class=SensorVibracionXDescansoInterno)
 
 
@@ -2679,7 +2647,7 @@ Se evaluan las anomalias en una ventana de 8 horas:
     """,
     response_description="Resultado de la prediccion con clasificacion y estado de alertas"
 )
-async def predecir_vibracion_y_interno(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_vibracion_y_interno(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="vibracion_y_descanso_interno", umbral_key="prediccion_vibracion-y-interno", model_class=SensorVibracionYDescansoInterno)
 
 
@@ -2731,7 +2699,7 @@ Se evaluan las anomalias en una ventana de 8 horas:
     """,
     response_description="Resultado de la prediccion con clasificacion y estado de alertas"
 )
-async def predecir_temp_agua_alim_domo_mp(sensor: SensorInput, db: Session = Depends(get_db)):
+def predecir_temp_agua_alim_domo_mp(sensor: SensorInput, db: Session = Depends(get_db)):
     return procesar(sensor, db, modelo_key="temp_agua_alim_domo_mp", umbral_key="prediccion_temperatura-agua-alim-domo-mp", model_class=SensorTemperaturaAguaAlimB)
 
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
+import time as _time
 
 from modelos.database import get_db
 from modelos.modelos import (
@@ -217,14 +218,24 @@ def _obtener_rango_datos_sensor(db: Session, modelo_sensor):
         return None, None
 
 
+_BOMBA_ACTIVA_CACHE = {"valor": None, "ts": 0}
+_BOMBA_ACTIVA_TTL = 60
+
+
 def _obtener_bomba_activa_actual(db: Session):
-    """Obtiene el último valor de bomba_activa."""
+    """Obtiene el último valor de bomba_activa con cache de 60 segundos."""
+    ahora = _time.time()
+    if ahora - _BOMBA_ACTIVA_CACHE["ts"] < _BOMBA_ACTIVA_TTL:
+        return _BOMBA_ACTIVA_CACHE["valor"]
     registro = (
         db.query(BombaActiva)
         .order_by(BombaActiva.id.desc())
         .first()
     )
-    return registro.bomba_activa if registro else None
+    val = registro.bomba_activa if registro else None
+    _BOMBA_ACTIVA_CACHE["valor"] = val
+    _BOMBA_ACTIVA_CACHE["ts"] = ahora
+    return val
 
 
 def _formato_origen(bomba_activa_valor, tabla_origen):

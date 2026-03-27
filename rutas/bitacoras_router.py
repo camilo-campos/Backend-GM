@@ -32,10 +32,11 @@ async def _get_and_classify_bitacoras(db: Session):
     no_clasificadas = [b for b in bitacoras if b.clasificacion is None]
     if no_clasificadas:
         for b in no_clasificadas:
-            primer_analisis = llm_chain.invoke({"bitacora": b.bitacora}).strip()
+            loop = asyncio.get_event_loop()
+            primer_analisis = await loop.run_in_executor(None, lambda b=b: llm_chain.invoke({"bitacora": b.bitacora}).strip())
             # Si detecta fallo específico (comparación en inglés)
             if "HRSG Pump Failures" in primer_analisis:
-                segundo_analisis = llm_chain_2.invoke({"bitacora": b.bitacora}).strip()
+                segundo_analisis = await loop.run_in_executor(None, lambda b=b: llm_chain_2.invoke({"bitacora": b.bitacora}).strip())
                 b.clasificacion = primer_analisis  # Guardar en inglés primero
                 b.alerta_aviso = segundo_analisis
             else:
@@ -101,14 +102,15 @@ Analiza el contenido de una bitácora de la Bomba A utilizando un modelo de leng
 )
 async def predecir_corriente(bitacora: BitacoraInput, db: Session = Depends(get_db)):
     try:
-        primer_analisis = llm_chain.invoke({"bitacora": bitacora.bitacora}).strip()
+        loop = asyncio.get_event_loop()
+        primer_analisis = await loop.run_in_executor(None, lambda: llm_chain.invoke({"bitacora": bitacora.bitacora}).strip())
         bitacora_db = db.query(GmBitacoraA).filter(GmBitacoraA.id == bitacora.id_bitacora).first()
         if not bitacora_db:
             raise HTTPException(status_code=404, detail="Bitacora no encontrada.")
 
         # Guardar clasificación en inglés primero (para que el proceso funcione correctamente)
         if "HRSG Pump Failures" in primer_analisis:
-            segundo_analisis = llm_chain_2.invoke({"bitacora": bitacora.bitacora}).strip()
+            segundo_analisis = await loop.run_in_executor(None, lambda: llm_chain_2.invoke({"bitacora": bitacora.bitacora}).strip())
             bitacora_db.clasificacion = primer_analisis
             bitacora_db.alerta_aviso = segundo_analisis
         else:
