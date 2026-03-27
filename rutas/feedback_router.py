@@ -19,7 +19,6 @@ from auth.dependencies import get_current_user
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
 
 ADMIN_EMAIL = "sd_fallabombas@generadora.cl"
-ADMIN_SUB = "efe8f35a-c1c7-4b78-9990-6dfbf97ea392"
 
 # IBM Cloud Object Storage
 COS_ENDPOINT = os.getenv("COS_ENDPOINT", "https://s3.us-south.cloud-object-storage.appdomain.cloud")
@@ -134,12 +133,12 @@ async def listar_feedback(
     tipo: Optional[TipoFeedback] = Query(None, description="Filtrar por tipo"),
     estado: Optional[EstadoFeedback] = Query(None, description="Filtrar por estado"),
     dias: Optional[int] = Query(None, description="Ultimos N dias", ge=1),
+    email: Optional[str] = Query(None, description="Email del usuario autenticado"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user_email = current_user.get("email", "")
-    user_sub = current_user.get("sub", "")
-    es_admin = user_email == ADMIN_EMAIL or user_sub == ADMIN_SUB or current_user.get("auth_method") == "api_key"
+    user_email = email or current_user.get("email", "")
+    es_admin = user_email == ADMIN_EMAIL or current_user.get("auth_method") == "api_key"
     if not es_admin:
         raise HTTPException(status_code=403, detail="No tienes permiso para ver los feedback")
 
@@ -186,12 +185,12 @@ async def listar_feedback(
 async def actualizar_estado_feedback(
     feedback_id: int,
     datos: FeedbackActualizarEstado,
+    email: Optional[str] = Query(None, description="Email del usuario autenticado"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user_email = current_user.get("email", "")
-    user_sub = current_user.get("sub", "")
-    es_admin = user_email == ADMIN_EMAIL or user_sub == ADMIN_SUB or current_user.get("auth_method") == "api_key"
+    user_email = email or current_user.get("email", "")
+    es_admin = user_email == ADMIN_EMAIL or current_user.get("auth_method") == "api_key"
     if not es_admin:
         raise HTTPException(status_code=403, detail="No tienes permiso para actualizar feedback")
 
@@ -228,12 +227,12 @@ async def actualizar_estado_feedback(
 )
 async def eliminar_feedback(
     feedback_id: int,
+    email: Optional[str] = Query(None, description="Email del usuario autenticado"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user_email = current_user.get("email", "")
-    user_sub = current_user.get("sub", "")
-    es_admin = user_email == ADMIN_EMAIL or user_sub == ADMIN_SUB or current_user.get("auth_method") == "api_key"
+    user_email = email or current_user.get("email", "")
+    es_admin = user_email == ADMIN_EMAIL or current_user.get("auth_method") == "api_key"
     if not es_admin:
         raise HTTPException(status_code=403, detail="No tienes permiso para eliminar feedback")
 
