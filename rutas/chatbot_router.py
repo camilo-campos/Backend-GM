@@ -12,12 +12,13 @@ import logging
 from modelos.database import get_db
 from modelos.modelos import ChatHistorial
 from auth.dependencies import get_current_user
+from langchain_llm.rag_engine import rag
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
 
-CHATBOT_MODEL = "ibm/granite-3-3-8b-instruct"
+CHATBOT_MODEL = "ibm/granite-3-8b-instruct"
 
 _chatbot_llm = None
 try:
@@ -57,129 +58,16 @@ def _respuesta_rapida(pregunta: str) -> str:
         return "Hasta luego! Si necesitas algo mas, no dudes en preguntar."
     return None
 
-# ─── PROMPT GENERAL: uso de la app, navegacion, funcionalidades ───
-PROMPT_GENERAL = """
-Eres un asistente virtual del Dashboard GM, una aplicacion de monitoreo predictivo de bombas de agua en la planta termoelectrica Nueva Renca.
-
-PAGINAS DE LA APLICACION:
-- Vision General: resumen de alertas recientes de ambas bombas y bitacoras con alertas.
-- Analisis de Anomalias A/B: graficos de cada sensor con valores normales (verde) y anomalias (rojo).
-- Analisis de Sensores A/B: datos en tiempo real de todos los sensores, valores actuales y tendencias.
-- Analisis de Bitacoras A/B: registros operativos de los operadores, clasificados por IA.
-- Feedback: enviar comentarios sobre funcionamiento, datos o felicidades. Se pueden adjuntar imagenes.
-
-CONCEPTOS CLAVE:
-- La planta tiene 2 bombas (A y B). Solo una esta activa a la vez.
-- Cada bomba tiene ~25 sensores monitoreados en tiempo real (datos cada minuto).
-- Cada sensor se clasifica con IA: 1 = Normal, -1 = Anomalia.
-- Las anomalias se acumulan en 8 horas y generan alertas: AVISO (56+), ALERTA (86+), CRITICA (116+).
-- Despues de una CRITICA el contador se reinicia.
-- Las bitacoras son textos de operadores clasificados por IA en categorias y niveles (ALERTA/AVISO).
-- Existe una prediccion global (Random Forest) que usa todos los sensores para predecir falla general.
+# ─── System prompt base (corto, el RAG inyecta contexto relevante) ───
+SYSTEM_PROMPT = """Eres un asistente virtual del Dashboard GM, una aplicacion de monitoreo predictivo de bombas de agua en la planta termoelectrica Nueva Renca (HRSG).
 
 REGLAS:
 - Responde en espanol, conciso y directo. Maximo 2-3 oraciones.
 - Si el usuario saluda, responde con un saludo breve y pregunta en que puedes ayudar.
-- NO describas la pagina actual sin que te lo pidan.
-- Responde solo lo que se pregunta.
-- Si preguntan algo fuera de la app, indica amablemente que solo ayudas con la aplicacion.
-"""
-
-# ─── PROMPT TECNICO: sensores, valores, umbrales, datos especificos ───
-PROMPT_TECNICO = """
-Eres un asistente tecnico del Dashboard GM, especializado en los sensores y datos de la planta termoelectrica Nueva Renca.
-
-SENSORES BOMBA A (25 sensores, 19 para prediccion global):
-Principales:
-  1. Corriente del motor - Amperios - Umbrales: 101/162/202
-  2. Presion de agua AP - bar - Umbrales: 118/188/235
-  3. MW brutos generacion gas - MW - Umbrales: 56/86/116
-  4. Temperatura ambiental - Celsius - Umbrales: 56/86/116
-  5. Temperatura descanso bomba 1A - Celsius - Umbrales: 86/137/171
-  6. Temperatura empuje bomba 1A - Celsius - Umbrales: 56/86/116
-  7. Temperatura motor bomba 1A - Celsius - Umbrales: 56/86/116
-  8. Vibracion axial descanso - mm/s - Umbrales: 56/86/116
-  9. Voltaje barra 6.6KV - kV - Umbrales: 56/86/116
-  10. Excentricidad bomba - mm - Umbrales: 56/86/116
-  11. Flujo agua domo AP - m3/h - Umbrales: 56/86/116
-  12. Flujo domo AP compensado - m3/h - Umbrales: 56/86/116
-  13. Flujo agua domo MP - m3/h - Umbrales: 56/86/116
-  14. Flujo agua recalentador - m3/h - Umbrales: 56/86/116
-  15. Flujo agua vapor alta - m3/h - Umbrales: 56/86/116
-  16. Posicion valvula recirculacion - % - Umbrales: 56/86/116
-  17. Presion agua MP - bar - Umbrales: 56/86/116
-  18. Presion succion BAA - bar - Umbrales: 56/86/116
-  19. Temperatura estator - Celsius - Umbrales: 56/86/116
-Extra (solo monitoreo individual):
-  20. Flujo salida 12FPMFC - m3/h
-  21. Vibracion X descanso interno - um - Umbrales: 67/106/133
-  22. Vibracion Y descanso interno - um
-  23. Vibracion X descanso externo - um - Umbrales: 60/96/120
-  24. Vibracion Y descanso externo - um
-  25. Temperatura agua alimentacion domo MP - Celsius
-
-SENSORES BOMBA B (26 sensores, 15 para prediccion global):
-Principales:
-  1. Corriente motor 1B - Amperios - Umbrales: 56/86/116
-  2. Presion agua econ AP - bar - Umbrales: 56/86/116
-  3. Temperatura ambiental - Celsius (compartido) - Umbrales: 56/86/116
-  4. Excentricidad bomba 1B - mm - Umbrales: 56/86/116
-  5. Flujo descarga AP - m3/h - Umbrales: 66/106/132
-  6. Flujo agua domo AP - m3/h - Umbrales: 56/86/116
-  7. Flujo agua domo MP - m3/h - Umbrales: 56/86/116
-  8. Flujo agua recalentador - m3/h - Umbrales: 56/86/116
-  9. Flujo agua vapor alta AP - m3/h - Umbrales: 56/86/116
-  10. Temperatura agua alimentacion AP - Celsius - Umbrales: 56/86/116
-  11. Temperatura estator motor 1B - Celsius - Umbrales: 56/86/116
-  12. Vibracion axial empuje 1B - mm/s - Umbrales: 56/86/116
-  13. Vibracion X descanso interno 1B - um - Umbrales: 67/106/133
-  14. Vibracion Y descanso interno 1B - um - Umbrales: 56/86/116
-  15. Voltaje barra 6.6KV - kV - Umbrales: 56/86/116
-Extra:
-  16-26. Temperaturas descanso, vibraciones externas, presion succion, posicion valvula, MW gas, flujos adicionales.
-
-SENSORES COMPARTIDOS (ambas bombas): Temperatura ambiental, MW brutos gas, Voltaje barra 6.6KV.
-
-UMBRALES (formato AVISO/ALERTA/CRITICA):
-- Representan cantidad de anomalias en 8 horas para cada nivel de alerta.
-- Ejemplo: Corriente Bomba A 101/162/202 = 101 anomalias para AVISO, 162 para ALERTA, 202 para CRITICA.
-- Umbral base: 56/86/116 (mayoria de sensores).
-- Sensores criticos (corriente, presion Bomba A) tienen umbrales mas altos.
-
-CLASIFICACION ML:
-- Isolation Forest por sensor: 1=Normal, -1=Anomalia.
-- Random Forest global: usa todos los sensores principales, predice falla general (0=Normal, 1=Falla).
-- Bomba A usa 19 features, Bomba B usa 15 features.
-
-REGLAS:
-- Responde en espanol, conciso y tecnico.
-- Si el usuario pregunta por un sensor, incluye su unidad de medida y umbrales.
-- Contextualiza segun la pagina donde esta el usuario.
-- Responde solo lo que se pregunta.
-"""
-
-# ─── Keywords para detectar intencion ───
-_KEYWORDS_TECNICO = [
-    "sensor", "sensores", "valor", "valores", "anomalia", "anomalias", "alerta", "alertas",
-    "umbral", "umbrales", "grafico", "graficos", "clasificacion", "clasificaciones",
-    "-1", "normal", "critica", "aviso",
-    "corriente", "vibracion", "temperatura", "presion", "flujo", "voltaje",
-    "excentricidad", "estator", "recalentador", "domo", "valvula",
-    "bomba a", "bomba b", "bomba 1a", "bomba 1b",
-    "isolation forest", "random forest", "modelo", "prediccion",
-    "mw", "bar", "celsius", "amperios", "mm/s",
-    "bitacora", "bitacoras", "hrsg",
-    "cuantos", "cuantas", "que mide", "que significa", "que es",
-]
-
-
-def _detectar_intencion(pregunta: str) -> str:
-    """Detecta si la pregunta es sobre uso general o datos tecnicos."""
-    pregunta_lower = pregunta.lower()
-    for kw in _KEYWORDS_TECNICO:
-        if kw in pregunta_lower:
-            return "tecnico"
-    return "general"
+- Responde SOLO sobre la aplicacion usando la INFORMACION RELEVANTE proporcionada.
+- Si no tienes informacion suficiente, di que no tienes esa informacion disponible.
+- NO inventes datos ni umbrales. Usa solo la informacion proporcionada.
+- Responde solo lo que se pregunta, no agregues informacion extra."""
 
 
 CONTEXTO_PAGINAS = {
@@ -235,11 +123,21 @@ def _format_mistral(system: str, historial: list, pregunta: str) -> str:
 
 
 def _construir_prompt(pregunta: str, pagina_actual: str, historial: list) -> str:
-    """Construye el prompt seleccionando GENERAL o TECNICO y el formato segun el modelo."""
-    intencion = _detectar_intencion(pregunta)
-    system = PROMPT_TECNICO if intencion == "tecnico" else PROMPT_GENERAL
+    """Construye el prompt usando RAG para inyectar solo informacion relevante."""
+    # Buscar chunks relevantes via RAG
+    chunks_relevantes = rag.buscar(pregunta, top_k=5)
 
-    # Agregar contexto de pagina al system prompt
+    # Determinar intencion para logging
+    intencion = "tecnico" if chunks_relevantes else "general"
+
+    # Construir system con chunks
+    system = SYSTEM_PROMPT
+    if chunks_relevantes:
+        system += "\n\nINFORMACION RELEVANTE:\n"
+        for chunk in chunks_relevantes:
+            system += f"- {chunk}\n"
+
+    # Agregar contexto de pagina
     if pagina_actual and pagina_actual in CONTEXTO_PAGINAS:
         system += f"\nCONTEXTO ACTUAL: {CONTEXTO_PAGINAS[pagina_actual]}\n"
 
@@ -252,7 +150,7 @@ def _construir_prompt(pregunta: str, pagina_actual: str, historial: list) -> str
     else:
         prompt = _format_llama(system, historial, pregunta)
 
-    logger.info(f"[CHATBOT] Formato: {'granite' if 'granite' in model_lower else 'mistral' if 'mistral' in model_lower else 'llama'}")
+    logger.info(f"[CHATBOT] Formato: {'granite' if 'granite' in model_lower else 'mistral' if 'mistral' in model_lower else 'llama'} | Chunks: {len(chunks_relevantes)}")
     return prompt, intencion
 
 
