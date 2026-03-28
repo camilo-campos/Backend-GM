@@ -89,6 +89,7 @@ def _generar_url_imagen(key: str) -> str:
 async def crear_feedback(
     tipo: TipoFeedback = Form(...),
     mensaje: str = Form(..., min_length=1, max_length=2000),
+    email: Optional[str] = Form(None, description="Email del usuario que envia el feedback"),
     imagen: Optional[UploadFile] = File(None),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -98,8 +99,9 @@ async def crear_feedback(
         if imagen and imagen.filename:
             imagen_url = await _subir_imagen_cos(imagen)
 
+        usuario_email = email or current_user.get("email") or current_user.get("sub", "desconocido")
         nuevo = Feedback(
-            usuario_email=current_user.get("email") or current_user.get("sub", "desconocido"),
+            usuario_email=usuario_email,
             tipo=tipo.value,
             mensaje=mensaje,
             estado="pendiente",

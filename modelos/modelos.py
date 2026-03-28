@@ -457,3 +457,14 @@ class Feedback(Base):
     imagen_url = Column(Text, nullable=True)
     fecha_creacion = Column(DateTime, default=func.now())
     fecha_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class ChatHistorial(Base):
+    __tablename__ = 'chat_historial'
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(100), nullable=False, index=True)
+    rol = Column(String(20), nullable=False)  # "user" o "assistant"
+    mensaje = Column(Text, nullable=False)
+    pagina = Column(String(100), nullable=True)
+    timestamp = Column(DateTime, default=func.now())
