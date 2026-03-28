@@ -105,7 +105,7 @@ CHUNKS = [
 
     # ─── BITACORAS ───
     "Las bitacoras son registros de texto libre escritos por los operadores de la planta describiendo eventos operativos, incidentes, observaciones o novedades del turno. Tambien llamadas registros operativos, logs de operacion, notas de turno, reportes de turno.",
-    "Un modelo de IA (Llama 3.3 70B de IBM WatsonX) clasifica automaticamente cada bitacora en categorias: Fallas de bombas HRSG, Fugas, Eventos de frecuencia y carga, Mediciones operativas, Cambio de combustible, Otras fallas de bombas, Otros eventos operativos.",
+    "Las categorias de las bitacoras son 7: 1) Fallas de bombas HRSG, 2) Fugas y filtraciones, 3) Eventos de frecuencia y carga, 4) Mediciones operativas, 5) Cambio de combustible, 6) Otras fallas de bombas, 7) Otros eventos operativos. Un modelo de IA (Llama 3.3 70B de IBM WatsonX) clasifica automaticamente cada bitacora en una de estas categorias. Tambien conocido como tipos de bitacora, clasificacion de bitacoras, en que se clasifican las bitacoras.",
     "Las bitacoras se clasifican en ALERTA (falla que ya ocurrio en la planta, requiere accion) o AVISO (posible falla o situacion que debe ser revisada por el operador). Esto lo hace automaticamente la IA.",
     "Las subcategorias de fallas HRSG incluyen: sobrecalentamiento de componentes, fugas de agua en HRSG, problemas de bajo flujo, variaciones anormales de presion, eventos en sistemas relacionados (turbina de vapor, caldera), y vibraciones en bombas.",
 

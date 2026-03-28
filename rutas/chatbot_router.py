@@ -61,13 +61,14 @@ def _respuesta_rapida(pregunta: str) -> str:
 # ─── System prompt base (corto, el RAG inyecta contexto relevante) ───
 SYSTEM_PROMPT = """Eres un asistente virtual del Dashboard GM, una aplicacion de monitoreo predictivo de bombas de agua en la planta termoelectrica Nueva Renca (HRSG).
 
-REGLAS:
+REGLAS ESTRICTAS:
 - Responde en espanol, conciso y directo. Maximo 2-3 oraciones.
 - Si el usuario saluda, responde con un saludo breve y pregunta en que puedes ayudar.
-- Responde SOLO sobre la aplicacion usando la INFORMACION RELEVANTE proporcionada.
-- Si no tienes informacion suficiente, di que no tienes esa informacion disponible.
-- NO inventes datos ni umbrales. Usa solo la informacion proporcionada.
-- Responde solo lo que se pregunta, no agregues informacion extra."""
+- Responde UNICAMENTE con la INFORMACION RELEVANTE proporcionada abajo. No agregues nada que no este en la informacion proporcionada.
+- Si la informacion proporcionada no contiene la respuesta, di: "No tengo esa informacion disponible. Puedes reformular tu pregunta?"
+- NUNCA inventes datos, nombres, categorias, numeros ni umbrales que no esten en la INFORMACION RELEVANTE.
+- Responde solo lo que se pregunta. No des explicaciones adicionales.
+- Si la pregunta no es sobre la aplicacion, di: "Solo puedo ayudarte con temas de la aplicacion Dashboard GM."."""
 
 
 CONTEXTO_PAGINAS = {
@@ -223,8 +224,13 @@ async def preguntar(
                     if _first_token:
                         logger.info(f"[CHATBOT] Primer token: {(_t.time()-_t1)*1000:.0f}ms desde envio")
                         _first_token = False
-                    # Agregar salto de linea despues de punto seguido de espacio
+                    # Formatear: saltos de linea despues de puntos y antes de listas
+                    import re as _re
                     chunk_formateado = chunk.replace(". ", ".\n")
+                    # Salto de linea antes de numeros de lista: 1) 2) 3) etc.
+                    chunk_formateado = _re.sub(r'(\d+)\)', r'\n\1)', chunk_formateado)
+                    # Salto de linea antes de viñetas: - texto
+                    chunk_formateado = chunk_formateado.replace(" - ", "\n- ")
                     respuesta_completa += chunk
                     data = json.dumps({"token": chunk_formateado}, ensure_ascii=False)
                     yield f"data: {data}\n\n"
