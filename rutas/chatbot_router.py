@@ -17,12 +17,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
 
-# ─── Modelo configurable via variable de entorno ───
-# Cambiar CHATBOT_MODEL en .env para probar velocidad:
-#   meta-llama/llama-3-3-70b-instruct  (lento, alta calidad)
-#   meta-llama/llama-3-1-8b-instruct   (rapido, buena calidad)
-#   ibm/granite-3-8b-instruct          (rapido, optimizado IBM)
-CHATBOT_MODEL = os.getenv("CHATBOT_MODEL", "ibm/granite-3-3-8b-instruct")
+CHATBOT_MODEL = "ibm/granite-3-3-8b-instruct"
 
 _chatbot_llm = None
 try:
